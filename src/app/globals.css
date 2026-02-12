@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-blue: #3b82f6;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* 政党カラー */
+.party-ldp { background: #255b2b; }        /* 自民党 - 緑 */
+.party-cdp { background: #1e3a5f; }        /* 立憲民主 - 青 */
+.party-komeito { background: #8b5e3c; }    /* 公明党 - 茶 */
+.party-ishin { background: #5c4a8a; }      /* 維新 - 紫 */
+.party-dpfp { background: #8a6d3b; }       /* 国民民主 - 黄茶 */
+.party-jcp { background: #8b2232; }        /* 共産党 - 赤 */
+.party-reiwa { background: #7a3b8a; }      /* れいわ - 薄紫 */
+.party-other { background: #475569; }      /* その他 */
+
+.party-tag-ldp { color: #4ade80; border-color: #4ade80; }
+.party-tag-cdp { color: #60a5fa; border-color: #60a5fa; }
+.party-tag-komeito { color: #f59e0b; border-color: #f59e0b; }
+.party-tag-ishin { color: #a78bfa; border-color: #a78bfa; }
+.party-tag-dpfp { color: #fbbf24; border-color: #fbbf24; }
+.party-tag-jcp { color: #f87171; border-color: #f87171; }
+.party-tag-reiwa { color: #c084fc; border-color: #c084fc; }
+.party-tag-other { color: #94a3b8; border-color: #94a3b8; }
