@@ -19,7 +19,7 @@ type SortMode = 'name' | 'speeches' | 'recent'
 type SearchMode = 'legislator' | 'speech'
 
 export default function Home() {
-  const [legislators, setLegislators] = useState<(Legislator & { speech_count: number })[]>([])
+  const [legislators, setLegislators] = useState<(Legislator & { speech_count: number; is_member?: boolean })[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [partyFilter, setPartyFilter] = useState('all')
@@ -29,6 +29,7 @@ export default function Home() {
   const [speechResults, setSpeechResults] = useState<any[]>([])
   const [searchingSpeeches, setSearchingSpeeches] = useState(false)
   const [stats, setStats] = useState({ legislators: 0, speeches: 0, meetings: 0 })
+  const [memberFilter, setMemberFilter] = useState<'members' | 'others' | 'all'>('members')
 
   useEffect(() => {
     async function load() {
@@ -55,6 +56,9 @@ export default function Home() {
   // フィルター＋ソート
   const filtered = legislators
     .filter((leg) => {
+      // 議員/非議員フィルター
+      if (memberFilter === 'members' && leg.is_member === false) return false
+      if (memberFilter === 'others' && leg.is_member !== false) return false
       if (searchMode === 'legislator' && searchQuery) {
         const q = searchQuery.toLowerCase()
         const matchName = leg.name.toLowerCase().includes(q)
@@ -210,6 +214,25 @@ export default function Home() {
 
       {/* フィルター + ソート */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
+        {/* 議員/発言者フィルター */}
+        <div className="flex gap-1 mr-2">
+          {([
+            { key: 'members', label: '👤 議員' },
+            { key: 'others', label: '🏢 その他の発言者' },
+            { key: 'all', label: '全員' },
+          ] as { key: 'members' | 'others' | 'all'; label: string }[]).map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setMemberFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                memberFilter === f.key ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="w-full sm:w-auto" />
         {/* 院フィルター */}
         <div className="flex gap-1 mr-2">
           {(['all', '衆議院', '参議院'] as const).map((house) => (
