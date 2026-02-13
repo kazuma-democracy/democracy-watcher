@@ -104,13 +104,15 @@ export default function Home() {
       {(() => {
         const memberCount = legislators.filter(l => l.is_member !== false).length
         const otherCount = legislators.filter(l => l.is_member === false).length
-        const displayCount = memberFilter === 'members' ? memberCount : memberFilter === 'others' ? otherCount : legislators.length
-        const displayLabel = memberFilter === 'members' ? '人の議員' : memberFilter === 'others' ? '人の発言者' : '人（全員）'
         return (
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-4 gap-3 mb-8">
             <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-              <div className="text-3xl font-bold text-blue-400">{displayCount.toLocaleString()}</div>
-              <div className="text-sm text-slate-400 mt-1">{displayLabel}</div>
+              <div className="text-3xl font-bold text-blue-400">{memberCount.toLocaleString()}</div>
+              <div className="text-sm text-slate-400 mt-1">人の議員</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+              <div className="text-3xl font-bold text-purple-400">{otherCount.toLocaleString()}</div>
+              <div className="text-sm text-slate-400 mt-1">人の有識者等</div>
             </div>
             <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
               <div className="text-3xl font-bold text-emerald-400">{stats.speeches.toLocaleString()}</div>
