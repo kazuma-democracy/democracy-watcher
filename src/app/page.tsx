@@ -31,6 +31,7 @@ export default function Home() {
         .from('legislators')
         .select('*')
         .order('name')
+        .limit(5000)
 
       if (error) {
         console.error(error)
