@@ -80,6 +80,7 @@ export async function getLegislators() {
     .from('legislators')
     .select('*')
     .order('name')
+    .range(0, 4999)
   
   if (error) {
     console.error('Error fetching legislators:', error)
