@@ -22,6 +22,7 @@ export default function Home() {
   const [legislators, setLegislators] = useState<(Legislator & { speech_count: number; is_member?: boolean })[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [committedQuery, setCommittedQuery] = useState('')
   const [partyFilter, setPartyFilter] = useState('all')
   const [houseFilter, setHouseFilter] = useState<'all' | '衆議院' | '参議院'>('all')
   const [sortMode, setSortMode] = useState<SortMode>('speeches')
@@ -45,7 +46,15 @@ export default function Home() {
     load()
   }, [])
 
-  // 発言検索（ボタンクリック or Enter で実行）
+  // 検索実行（ボタンクリック or Enter）
+  function doSearch() {
+    setCommittedQuery(searchQuery)
+    if (searchMode === 'speech' && searchQuery.length >= 2) {
+      doSpeechSearch()
+    }
+  }
+
+  // 発言検索
   async function doSpeechSearch() {
     if (searchQuery.length < 2) return
     setSearchingSpeeches(true)
@@ -60,8 +69,8 @@ export default function Home() {
       // 議員/非議員フィルター
       if (memberFilter === 'members' && leg.is_member === false) return false
       if (memberFilter === 'others' && leg.is_member !== false) return false
-      if (searchMode === 'legislator' && searchQuery) {
-        const q = searchQuery.toLowerCase()
+      if (searchMode === 'legislator' && committedQuery) {
+        const q = committedQuery.toLowerCase()
         const matchName = leg.name.toLowerCase().includes(q)
         const matchYomi = leg.name_yomi?.toLowerCase().includes(q)
         const matchParty = leg.current_party?.toLowerCase().includes(q)
@@ -131,7 +140,7 @@ export default function Home() {
       <div className="mb-6">
         <div className="flex gap-2 mb-2">
           <button
-            onClick={() => { setSearchMode('legislator'); setSpeechResults([]); setSpeakerFilter('') }}
+            onClick={() => { setSearchMode('legislator'); setSpeechResults([]); setSpeakerFilter(''); setCommittedQuery('') }}
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
               searchMode === 'legislator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
             }`}
@@ -139,7 +148,7 @@ export default function Home() {
             👤 議員検索
           </button>
           <button
-            onClick={() => setSearchMode('speech')}
+            onClick={() => { setSearchMode('speech'); setCommittedQuery('') }}
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
               searchMode === 'speech' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
             }`}
@@ -154,18 +163,16 @@ export default function Home() {
             placeholder={searchMode === 'legislator' ? '議員名・政党名で検索...' : '発言内容をキーワードで検索（例: 防衛費、少子化）...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && searchMode === 'speech') doSpeechSearch() }}
+            onKeyDown={(e) => { if (e.key === 'Enter') doSearch() }}
             className="w-full bg-slate-800 border border-slate-600 rounded-xl py-3 pl-12 pr-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
           />
-          {searchMode === 'speech' && (
-            <button
-              onClick={doSpeechSearch}
-              disabled={searchQuery.length < 2 || searchingSpeeches}
-              className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-xl transition-colors shrink-0"
-            >
-              検索
-            </button>
-          )}
+          <button
+            onClick={doSearch}
+            disabled={searchQuery.length < 1 || searchingSpeeches}
+            className={`px-5 py-3 ${searchMode === 'speech' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'} disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-xl transition-colors shrink-0`}
+          >
+            検索
+          </button>
         </div>
         {/* 発言者フィルター（発言検索モード時のみ） */}
         {searchMode === 'speech' && (
