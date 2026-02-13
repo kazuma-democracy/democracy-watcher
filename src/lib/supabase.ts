@@ -137,10 +137,22 @@ export async function getStats() {
 export async function searchSpeeches(keyword: string, limit = 50) {
   const { data, error } = await supabase
     .from('speeches')
-    .select('*, legislators!inner(name, name_yomi, current_party), meetings(meeting_name, house, date)')
+    .select('id, speech_id, legislator_id, content, date, speaker_name, speaker_group, meetings(meeting_name, house, date)')
     .ilike('content', '%' + keyword + '%')
     .order('date', { ascending: false })
     .limit(limit)
-  if (error) return []
-  return data
+  if (error) {
+    console.error('Search error:', error)
+    return []
+  }
+  // legislator情報を別途取得
+  if (!data || data.length === 0) return []
+  const legIds = Array.from(new Set(data.map((s: any) => s.legislator_id).filter(Boolean)))
+  const { data: legs } = await supabase
+    .from('legislators')
+    .select('id, name, name_yomi, current_party')
+    .in('id', legIds)
+  const legMap: Record<string, any> = {}
+  for (const l of (legs || [])) legMap[l.id] = l
+  return data.map((s: any) => ({ ...s, legislators: legMap[s.legislator_id] || { name: s.speaker_name, current_party: s.speaker_group } }))
 }

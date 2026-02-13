@@ -43,20 +43,14 @@ export default function Home() {
     load()
   }, [])
 
-  // 発言検索
-  useEffect(() => {
-    if (searchMode !== 'speech' || searchQuery.length < 2) {
-      setSpeechResults([])
-      return
-    }
-    const timer = setTimeout(async () => {
-      setSearchingSpeeches(true)
-      const results = await searchSpeeches(searchQuery, 30)
-      setSpeechResults(results)
-      setSearchingSpeeches(false)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [searchQuery, searchMode])
+  // 発言検索（ボタンクリック or Enter で実行）
+  async function doSpeechSearch() {
+    if (searchQuery.length < 2) return
+    setSearchingSpeeches(true)
+    const results = await searchSpeeches(searchQuery, 30)
+    setSpeechResults(results)
+    setSearchingSpeeches(false)
+  }
 
   // フィルター＋ソート
   const filtered = legislators
@@ -138,20 +132,30 @@ export default function Home() {
             💬 発言検索
           </button>
         </div>
-        <div className="relative">
+        <div className="relative flex gap-2">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
           <input
             type="text"
             placeholder={searchMode === 'legislator' ? '議員名・政党名で検索...' : '発言内容をキーワードで検索（例: 防衛費、少子化）...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && searchMode === 'speech') doSpeechSearch() }}
             className="w-full bg-slate-800 border border-slate-600 rounded-xl py-3 pl-12 pr-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
           />
+          {searchMode === 'speech' && (
+            <button
+              onClick={doSpeechSearch}
+              disabled={searchQuery.length < 2 || searchingSpeeches}
+              className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-xl transition-colors shrink-0"
+            >
+              検索
+            </button>
+          )}
         </div>
       </div>
 
       {/* 発言検索結果 */}
-      {searchMode === 'speech' && searchQuery.length >= 2 && (
+      {searchMode === 'speech' && (searchingSpeeches || speechResults.length > 0) && (
         <div className="mb-8">
           {searchingSpeeches ? (
             <div className="text-center py-8">
