@@ -13,6 +13,7 @@ const PARTY_FILTERS = [
   { key: '共産', label: '共産', color: 'party-tag-jcp' },
   { key: 'れいわ', label: 'れいわ', color: 'party-tag-reiwa' },
   { key: '参政', label: '参政', color: 'party-tag-sansei' },
+  { key: '社会民主党', label: '社民', color: 'party-tag-sdp' },
   { key: '保守', label: '保守党', color: 'party-tag-other' },
   { key: '有志の会', label: '有志', color: 'party-tag-other' },
   { key: '沖縄の風', label: '沖縄', color: 'party-tag-other' },
