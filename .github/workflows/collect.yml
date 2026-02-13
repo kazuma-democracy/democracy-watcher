@@ -1,0 +1,52 @@
+name: Daily Data Collection
+
+on:
+  schedule:
+    # 毎日 UTC 15:00 (JST 00:00) に実行
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    # 手動実行も可能
+    inputs:
+      days:
+        description: '取得日数 (デフォルト: 3)'
+        required: false
+        default: '3'
+      from_date:
+        description: '開始日 (YYYY-MM-DD, 空なら自動)'
+        required: false
+      until_date:
+        description: '終了日 (YYYY-MM-DD, 空なら今日)'
+        required: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements-collect.txt
+
+      - name: Run collection
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.from_date }}" ] && [ -n "${{ github.event.inputs.until_date }}" ]; then
+            python collect_daily.py --from "${{ github.event.inputs.from_date }}" --until "${{ github.event.inputs.until_date }}"
+          else
+            python collect_daily.py --days ${{ github.event.inputs.days || '3' }}
+          fi
+
+      - name: Summary
+        if: always()
+        run: echo "Collection completed at $(date -u '+%Y-%m-%d %H:%M UTC')"
