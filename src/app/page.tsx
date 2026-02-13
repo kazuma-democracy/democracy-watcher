@@ -101,20 +101,28 @@ export default function Home() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* 統計バー */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-          <div className="text-3xl font-bold text-blue-400">{stats.legislators.toLocaleString()}</div>
-          <div className="text-sm text-slate-400 mt-1">人の議員</div>
-        </div>
-        <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-          <div className="text-3xl font-bold text-emerald-400">{stats.speeches.toLocaleString()}</div>
-          <div className="text-sm text-slate-400 mt-1">件の発言</div>
-        </div>
-        <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-          <div className="text-3xl font-bold text-amber-400">{stats.meetings.toLocaleString()}</div>
-          <div className="text-sm text-slate-400 mt-1">件の会議</div>
-        </div>
-      </div>
+      {(() => {
+        const memberCount = legislators.filter(l => l.is_member !== false).length
+        const otherCount = legislators.filter(l => l.is_member === false).length
+        const displayCount = memberFilter === 'members' ? memberCount : memberFilter === 'others' ? otherCount : legislators.length
+        const displayLabel = memberFilter === 'members' ? '人の議員' : memberFilter === 'others' ? '人の発言者' : '人（全員）'
+        return (
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+              <div className="text-3xl font-bold text-blue-400">{displayCount.toLocaleString()}</div>
+              <div className="text-sm text-slate-400 mt-1">{displayLabel}</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+              <div className="text-3xl font-bold text-emerald-400">{stats.speeches.toLocaleString()}</div>
+              <div className="text-sm text-slate-400 mt-1">件の発言</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+              <div className="text-3xl font-bold text-amber-400">{stats.meetings.toLocaleString()}</div>
+              <div className="text-sm text-slate-400 mt-1">件の会議</div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* 検索モード切替 + 検索バー */}
       <div className="mb-6">
