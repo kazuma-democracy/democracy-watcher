@@ -59,7 +59,12 @@ export function getPartyClass(party: string | null): string {
   if (party.includes('共産')) return 'jcp'
   if (party.includes('れいわ')) return 'reiwa'
   if (party.includes('参政')) return 'sansei'
+  if (party.includes('保守')) return 'hoshu'
+  if (party.includes('有志の会')) return 'yushi'
+  if (party.includes('沖縄の風')) return 'okinawa'
+  if (party.includes('NHK') || party.includes('ＮＨＫ')) return 'nhk'
   if (party.includes('みらい') || party.includes('安野')) return 'mirai'
+  if (party.includes('減税')) return 'other'
   return 'other'
 }
 
@@ -74,8 +79,14 @@ export function getPartyShortName(party: string | null): string {
   if (party.includes('共産')) return '共産'
   if (party.includes('れいわ')) return 'れいわ'
   if (party.includes('参政')) return '参政'
+  if (party.includes('保守')) return '保守'
+  if (party.includes('有志の会')) return '有志'
+  if (party.includes('沖縄の風')) return '沖縄'
+  if (party.includes('NHK') || party.includes('ＮＨＫ')) return 'NHK'
   if (party.includes('みらい')) return 'みらい'
+  if (party.includes('減税')) return '減税'
   if (party.includes('無所属')) return '無所属'
+  if (party.includes('各派に属しない')) return '無所属'
   if (party.length > 6) return party.substring(0, 5) + '…'
   return party
 }
@@ -152,4 +163,73 @@ export async function searchSpeeches(keyword: string, limit = 50, speakerName?: 
 
   if (error) return []
   return data
+}
+
+// === 議案関連 ===
+
+export type Bill = {
+  id: string
+  house: string
+  session: number | null
+  submit_session: number | null
+  bill_type: string | null
+  bill_number: number | null
+  bill_name: string
+  caption: string | null
+  status: string | null
+  proposer: string | null
+  proposer_party: string | null
+  committee: string | null
+  date_submitted: string | null
+  date_passed: string | null
+  result: string | null
+  law_number: string | null
+  progress_url: string | null
+  bill_votes?: BillVote[]
+}
+
+export type BillVote = {
+  id: string
+  bill_id: string
+  party_name: string
+  vote: string  // '賛成' or '反対'
+  chamber: string
+}
+
+export async function getBills(options: {
+  session?: number
+  status?: string
+  billType?: string
+  search?: string
+  limit?: number
+  offset?: number
+} = {}) {
+  const { session, status, billType, search, limit = 50, offset = 0 } = options
+
+  let query = supabase
+    .from('bills')
+    .select('*, bill_votes(*)')
+    .order('session', { ascending: false })
+    .order('bill_number', { ascending: true })
+    .range(offset, offset + limit - 1)
+
+  if (session) query = query.eq('session', session)
+  if (status) query = query.eq('status', status)
+  if (billType) query = query.eq('bill_type', billType)
+  if (search) query = query.ilike('bill_name', `%${search}%`)
+
+  const { data, error } = await query
+  if (error) { console.error(error); return [] }
+  return data as Bill[]
+}
+
+export async function getBillSessions(): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select('session')
+    .order('session', { ascending: false })
+
+  if (error || !data) return []
+  const sessions = [...new Set(data.map((d: any) => d.session).filter(Boolean))] as number[]
+  return sessions.sort((a, b) => b - a)
 }

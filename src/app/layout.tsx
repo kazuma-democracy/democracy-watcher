@@ -33,6 +33,9 @@ export default function RootLayout({
               <a href="/meetings" className="text-slate-300 hover:text-white transition-colors">
                 会議一覧
               </a>
+              <a href="/bills" className="text-slate-300 hover:text-white transition-colors">
+                議案・採決
+              </a>
               <a href="/compare" className="text-slate-300 hover:text-white transition-colors">
                 議員比較
               </a>
@@ -56,6 +59,10 @@ export default function RootLayout({
               出典：
               <a href="https://kokkai.ndl.go.jp/" target="_blank" rel="noopener" className="underline hover:text-slate-300">
                 国立国会図書館 国会会議録検索システム
+              </a>
+              {' '}／{' '}
+              <a href="https://smartnews-smri.github.io/house-of-representatives/" target="_blank" rel="noopener" className="underline hover:text-slate-300">
+                スマートニュース メディア研究所
               </a>
             </p>
           </div>
