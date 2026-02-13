@@ -20,7 +20,14 @@ export default function MeetingsPage() {
   const [loading, setLoading] = useState(true)
   const [houseFilter, setHouseFilter] = useState<'all' | '衆議院' | '参議院'>('all')
   const [page, setPage] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const perPage = 30
+
+  function doSearch() {
+    setSearchQuery(searchInput.trim())
+    setPage(0)
+  }
 
   useEffect(() => {
     async function load() {
@@ -52,6 +59,7 @@ export default function MeetingsPage() {
 
   const filtered = meetings.filter(m => {
     if (houseFilter !== 'all' && m.house !== houseFilter) return false
+    if (searchQuery && !m.meeting_name.includes(searchQuery) && !m.date.includes(searchQuery) && !(m.issue_number || '').includes(searchQuery)) return false
     return true
   })
 
@@ -96,7 +104,33 @@ export default function MeetingsPage() {
         </div>
       </div>
 
-      <div className="text-sm text-slate-500 mb-4">{filtered.length}件の会議（新しい順）</div>
+      {/* 検索バー */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="委員会名・日付で検索..."
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') doSearch() }}
+          className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-xl py-2 px-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+        />
+        <button
+          onClick={doSearch}
+          className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0"
+        >
+          検索
+        </button>
+        {searchQuery && (
+          <button
+            onClick={() => { setSearchInput(''); setSearchQuery(''); setPage(0) }}
+            className="px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-slate-200 bg-slate-800 border border-slate-700 transition-colors shrink-0"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="text-sm text-slate-500 mb-4">{filtered.length}件の会議{searchQuery && `（「${searchQuery}」で絞り込み）`}（新しい順）</div>
 
       {Object.entries(grouped).map(([date, items]) => (
         <div key={date} className="mb-6">
