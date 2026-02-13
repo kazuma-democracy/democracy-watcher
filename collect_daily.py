@@ -179,7 +179,7 @@ def upsert_meetings(meetings: list[dict]):
     batch_size = 500
     for i in range(0, len(unique), batch_size):
         batch = unique[i:i + batch_size]
-        supabase.table("meetings").upsert(batch, on_conflict="id").execute()
+        supabase.table("meetings").upsert(batch, on_conflict="issue_id").execute()
     print(f"  会議: {len(unique)}件 upserted")
 
 

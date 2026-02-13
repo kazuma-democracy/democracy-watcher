@@ -28,6 +28,7 @@ export default function Home() {
   const [searchMode, setSearchMode] = useState<SearchMode>('legislator')
   const [speechResults, setSpeechResults] = useState<any[]>([])
   const [searchingSpeeches, setSearchingSpeeches] = useState(false)
+  const [speakerFilter, setSpeakerFilter] = useState('')
   const [stats, setStats] = useState({ legislators: 0, speeches: 0, meetings: 0 })
   const [memberFilter, setMemberFilter] = useState<'members' | 'others' | 'all'>('members')
 
@@ -48,7 +49,7 @@ export default function Home() {
   async function doSpeechSearch() {
     if (searchQuery.length < 2) return
     setSearchingSpeeches(true)
-    const results = await searchSpeeches(searchQuery, 30)
+    const results = await searchSpeeches(searchQuery, 30, speakerFilter || undefined)
     setSpeechResults(results)
     setSearchingSpeeches(false)
   }
@@ -130,7 +131,7 @@ export default function Home() {
       <div className="mb-6">
         <div className="flex gap-2 mb-2">
           <button
-            onClick={() => { setSearchMode('legislator'); setSpeechResults([]) }}
+            onClick={() => { setSearchMode('legislator'); setSpeechResults([]); setSpeakerFilter('') }}
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
               searchMode === 'legislator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
             }`}
@@ -166,6 +167,28 @@ export default function Home() {
             </button>
           )}
         </div>
+        {/* 発言者フィルター（発言検索モード時のみ） */}
+        {searchMode === 'speech' && (
+          <div className="relative mt-2">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">👤</span>
+            <input
+              type="text"
+              placeholder="発言者名で絞り込み（例: 高市、石破）..."
+              value={speakerFilter}
+              onChange={(e) => setSpeakerFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') doSpeechSearch() }}
+              className="w-full bg-slate-800/70 border border-slate-700 rounded-xl py-2 pl-12 pr-4 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+            />
+            {speakerFilter && (
+              <button
+                onClick={() => setSpeakerFilter('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-sm"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 発言検索結果 */}
@@ -177,7 +200,9 @@ export default function Home() {
             </div>
           ) : speechResults.length > 0 ? (
             <div>
-              <div className="text-sm text-slate-400 mb-3">💬 「{searchQuery}」を含む発言: {speechResults.length}件</div>
+              <div className="text-sm text-slate-400 mb-3">
+                💬 「{searchQuery}」を含む発言{speakerFilter ? `（${speakerFilter}）` : ''}: {speechResults.length}件
+              </div>
               <div className="space-y-3">
                 {speechResults.map((sp: any) => {
                   const content = sp.content || ''
