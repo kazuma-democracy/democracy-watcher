@@ -32,6 +32,8 @@ export default function LegislatorPage() {
   const [loading, setLoading] = useState(true)
   const [expandedSpeech, setExpandedSpeech] = useState<string | null>(null)
   const [showCount, setShowCount] = useState(20)
+  const [committees, setCommittees] = useState<{name: string; count: number}[]>([])
+  const [monthly, setMonthly] = useState<{month: string; count: number}[]>([])
 
   useEffect(() => {
     async function load() {
@@ -60,6 +62,35 @@ export default function LegislatorPage() {
         .limit(50)
 
       if (sp) setSpeeches(sp as SpeechWithMeeting[])
+
+      // 委員会別集計
+      const { data: allSp } = await supabase
+        .from('speeches')
+        .select('meetings(meeting_name)')
+        .eq('legislator_id', id)
+        .range(0, 4999)
+
+      const cMap: Record<string, number> = {}
+      for (const s of (allSp || [])) {
+        const name = (s as any).meetings?.meeting_name || '不明'
+        cMap[name] = (cMap[name] || 0) + 1
+      }
+      setCommittees(Object.entries(cMap).map(([name, cnt]) => ({name, count: cnt})).sort((a,b) => b.count - a.count).slice(0, 8))
+
+      // 月別集計
+      const { data: dates } = await supabase
+        .from('speeches')
+        .select('date')
+        .eq('legislator_id', id)
+        .range(0, 4999)
+
+      const mMap: Record<string, number> = {}
+      for (const s of (dates || [])) {
+        const m = (s as any).date?.substring(0, 7)
+        if (m) mMap[m] = (mMap[m] || 0) + 1
+      }
+      setMonthly(Object.entries(mMap).map(([month, cnt]) => ({month, count: cnt})).sort((a,b) => a.month.localeCompare(b.month)))
+
       setLoading(false)
     }
     load()
@@ -142,6 +173,67 @@ export default function LegislatorPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* グラフセクション */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {/* 月別発言数チャート */}
+        {monthly.length > 0 && (
+          <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+            <h3 className="text-sm font-bold text-slate-300 mb-4">📈 月別発言数</h3>
+            <div className="flex items-end gap-1 h-24">
+              {monthly.map(m => {
+                const maxM = Math.max(...monthly.map(x => x.count))
+                return (
+                  <div key={m.month} className="flex-1 flex flex-col items-center group relative">
+                    <div className="absolute -top-6 hidden group-hover:block bg-slate-700 text-xs text-slate-200 px-2 py-1 rounded whitespace-nowrap z-10">
+                      {m.month}: {m.count}件
+                    </div>
+                    <div
+                      className="w-full bg-emerald-500/60 hover:bg-emerald-500/80 rounded-t transition-colors"
+                      style={{ height: `${(m.count / maxM) * 100}%`, minHeight: m.count > 0 ? '2px' : '0' }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex justify-between text-xs text-slate-600 mt-1">
+              <span>{monthly[0].month}</span>
+              <span>{monthly[monthly.length - 1].month}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 委員会別発言数 */}
+        {committees.length > 0 && (
+          <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+            <h3 className="text-sm font-bold text-slate-300 mb-4">📋 委員会別発言数</h3>
+            <div className="space-y-2">
+              {committees.map(c => {
+                const maxC = committees[0].count
+                return (
+                  <div key={c.name} className="flex items-center gap-2">
+                    <div className="flex-1 text-xs text-slate-300 truncate" title={c.name}>{c.name}</div>
+                    <div className="w-28 bg-slate-700/30 rounded-full h-3 overflow-hidden">
+                      <div className="h-full rounded-full bg-blue-500/60" style={{ width: `${(c.count / maxC) * 100}%` }} />
+                    </div>
+                    <span className="text-xs text-slate-500 w-8 text-right">{c.count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 議員比較リンク */}
+      <div className="mb-8">
+        <a
+          href={`/compare?leg1=${id}`}
+          className="text-sm text-blue-400/70 hover:text-blue-400 transition-colors"
+        >
+          ⚖️ この議員を他の議員と比較する →
+        </a>
       </div>
 
       {/* 発言一覧 */}

@@ -30,12 +30,15 @@ export default function RootLayout({
               <a href="/" className="text-slate-300 hover:text-white transition-colors">
                 議員一覧
               </a>
-              <span className="text-slate-600 cursor-not-allowed" title="準備中">
-                合意形成
-              </span>
-              <span className="text-slate-600 cursor-not-allowed" title="準備中">
+              <a href="/meetings" className="text-slate-300 hover:text-white transition-colors">
+                会議一覧
+              </a>
+              <a href="/compare" className="text-slate-300 hover:text-white transition-colors">
+                議員比較
+              </a>
+              <a href="/stats" className="text-slate-300 hover:text-white transition-colors">
                 統計
-              </span>
+              </a>
             </nav>
           </div>
         </header>
