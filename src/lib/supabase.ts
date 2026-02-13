@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-// ★ .env.local に設定する
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
 
@@ -18,6 +17,7 @@ export type Legislator = {
   district: string | null
   first_seen: string | null
   last_seen: string | null
+  speech_count?: number
 }
 
 export type Speech = {
@@ -46,22 +46,26 @@ export type Meeting = {
   meeting_url: string | null
 }
 
-// === 政党カラー判定 ===
+// === 政党カラー判定（修正版） ===
 
 export function getPartyClass(party: string | null): string {
   if (!party) return 'other'
+  if (party === '社会民主党' || party === '社民党') return 'sdp'
   if (party.includes('自由民主党')) return 'ldp'
-  if (party.includes('立憲民主') || party.includes('社民')) return 'cdp'
+  if (party.includes('立憲民主')) return 'cdp'
   if (party.includes('公明')) return 'komeito'
   if (party.includes('維新')) return 'ishin'
   if (party.includes('国民民主')) return 'dpfp'
   if (party.includes('共産')) return 'jcp'
   if (party.includes('れいわ')) return 'reiwa'
+  if (party.includes('参政')) return 'sansei'
+  if (party.includes('みらい')) return 'mirai'
   return 'other'
 }
 
 export function getPartyShortName(party: string | null): string {
   if (!party) return '無所属'
+  if (party === '社会民主党' || party === '社民党') return '社民'
   if (party.includes('自由民主党')) return '自民'
   if (party.includes('立憲民主')) return '立憲'
   if (party.includes('公明')) return '公明'
@@ -69,24 +73,31 @@ export function getPartyShortName(party: string | null): string {
   if (party.includes('国民民主')) return '国民'
   if (party.includes('共産')) return '共産'
   if (party.includes('れいわ')) return 'れいわ'
+  if (party.includes('参政')) return '参政'
+  if (party.includes('みらい')) return 'みらい'
   if (party.includes('無所属')) return '無所属'
-  return party.substring(0, 4)
+  if (party.length > 6) return party.substring(0, 5) + '…'
+  return party
 }
 
 // === データ取得関数 ===
 
-export async function getLegislators() {
+export async function getLegislatorsWithCounts() {
   const { data, error } = await supabase
-    .from('legislators')
+    .from('legislators_with_counts')
     .select('*')
-    .order('name')
     .range(0, 4999)
-  
+
   if (error) {
-    console.error('Error fetching legislators:', error)
-    return []
+    console.error('View error, falling back:', error)
+    const { data: legs } = await supabase
+      .from('legislators')
+      .select('*')
+      .order('name')
+      .range(0, 4999)
+    return (legs || []).map((l: any) => ({ ...l, speech_count: 0 }))
   }
-  return data as Legislator[]
+  return data as (Legislator & { speech_count: number })[]
 }
 
 export async function getLegislator(id: string) {
@@ -95,11 +106,7 @@ export async function getLegislator(id: string) {
     .select('*')
     .eq('id', id)
     .single()
-  
-  if (error) {
-    console.error('Error fetching legislator:', error)
-    return null
-  }
+  if (error) return null
   return data as Legislator
 }
 
@@ -110,22 +117,8 @@ export async function getSpeeches(legislatorId: string, limit = 20) {
     .eq('legislator_id', legislatorId)
     .order('date', { ascending: false })
     .limit(limit)
-  
-  if (error) {
-    console.error('Error fetching speeches:', error)
-    return []
-  }
+  if (error) return []
   return data
-}
-
-export async function getSpeechCount(legislatorId: string) {
-  const { count, error } = await supabase
-    .from('speeches')
-    .select('*', { count: 'exact', head: true })
-    .eq('legislator_id', legislatorId)
-  
-  if (error) return 0
-  return count || 0
 }
 
 export async function getStats() {
@@ -134,10 +127,20 @@ export async function getStats() {
     supabase.from('speeches').select('*', { count: 'exact', head: true }),
     supabase.from('meetings').select('*', { count: 'exact', head: true }),
   ])
-  
   return {
     legislators: legislators.count || 0,
     speeches: speeches.count || 0,
     meetings: meetings.count || 0,
   }
+}
+
+export async function searchSpeeches(keyword: string, limit = 50) {
+  const { data, error } = await supabase
+    .from('speeches')
+    .select('*, legislators!inner(name, name_yomi, current_party), meetings(meeting_name, house, date)')
+    .ilike('content', '%' + keyword + '%')
+    .order('date', { ascending: false })
+    .limit(limit)
+  if (error) return []
+  return data
 }
