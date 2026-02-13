@@ -132,9 +132,14 @@ export default function LegislatorPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* 戻るリンク */}
-      <a href="/" className="text-sm text-slate-400 hover:text-blue-400 transition-colors mb-6 inline-block">
-        ← 議員一覧に戻る
-      </a>
+      <div className="flex items-center justify-between mb-6">
+        <a href="/" className="text-sm text-slate-400 hover:text-blue-400 transition-colors">
+          ← 議員一覧に戻る
+        </a>
+        <a href={`/compare?leg1=${id}`} className="text-xs text-slate-400 hover:text-blue-400 border border-slate-700 hover:border-blue-600 px-3 py-1.5 rounded-lg transition-colors">
+          ⚖️ この議員を比較
+        </a>
+      </div>
 
       {/* プロフィールカード */}
       <div className={`rounded-2xl overflow-hidden mb-8 border border-slate-700/50`}>

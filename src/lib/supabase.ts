@@ -17,6 +17,7 @@ export type Legislator = {
   district: string | null
   first_seen: string | null
   last_seen: string | null
+  is_member?: boolean
   speech_count?: number
 }
 

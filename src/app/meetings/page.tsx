@@ -105,7 +105,7 @@ export default function MeetingsPage() {
           </div>
           <div className="space-y-2">
             {items.map(m => (
-              <div key={m.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all">
+              <a key={m.id} href={`/meetings/${m.id}`} className="block bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 hover:bg-slate-800/70 transition-all cursor-pointer">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -122,18 +122,9 @@ export default function MeetingsPage() {
                       <span>💬 {m.speech_count}件の発言</span>
                     </div>
                   </div>
-                  {m.meeting_url && (
-                    <a
-                      href={m.meeting_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-400/60 hover:text-blue-400 transition-colors shrink-0 ml-3"
-                    >
-                      原文 ↗
-                    </a>
-                  )}
+                  <span className="text-xs text-slate-600 shrink-0 ml-3">詳細 →</span>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </div>
