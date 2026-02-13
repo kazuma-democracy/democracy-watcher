@@ -181,25 +181,30 @@ export default function LegislatorPage() {
         {monthly.length > 0 && (
           <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
             <h3 className="text-sm font-bold text-slate-300 mb-4">📈 月別発言数</h3>
-            <div className="flex items-end gap-1 h-24">
+            <div className="flex items-end gap-1.5 h-36">
               {monthly.map(m => {
                 const maxM = Math.max(...monthly.map(x => x.count))
+                const pct = maxM > 0 ? (m.count / maxM) * 100 : 0
                 return (
-                  <div key={m.month} className="flex-1 flex flex-col items-center group relative">
-                    <div className="absolute -top-6 hidden group-hover:block bg-slate-700 text-xs text-slate-200 px-2 py-1 rounded whitespace-nowrap z-10">
+                  <div key={m.month} className="flex-1 flex flex-col items-center group relative" style={{ minWidth: '20px' }}>
+                    <div className="absolute -top-7 hidden group-hover:block bg-slate-700 text-xs text-slate-200 px-2 py-1 rounded whitespace-nowrap z-10 shadow-lg">
                       {m.month}: {m.count}件
                     </div>
+                    <div className="text-xs text-slate-500 mb-1 hidden group-hover:block">{m.count}</div>
                     <div
-                      className="w-full bg-emerald-500/60 hover:bg-emerald-500/80 rounded-t transition-colors"
-                      style={{ height: `${(m.count / maxM) * 100}%`, minHeight: m.count > 0 ? '2px' : '0' }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 rounded-t transition-colors"
+                      style={{ height: `${pct}%`, minHeight: m.count > 0 ? '4px' : '0' }}
                     />
                   </div>
                 )
               })}
             </div>
-            <div className="flex justify-between text-xs text-slate-600 mt-1">
-              <span>{monthly[0].month}</span>
-              <span>{monthly[monthly.length - 1].month}</span>
+            <div className="flex justify-between text-xs text-slate-500 mt-2 border-t border-slate-700/30 pt-2">
+              {monthly.map((m, i) => (
+                <span key={m.month} className={`${monthly.length > 6 && i % 2 !== 0 ? 'hidden sm:inline' : ''}`} style={{ flex: 1, textAlign: 'center', fontSize: '10px' }}>
+                  {m.month.substring(5)}月
+                </span>
+              ))}
             </div>
           </div>
         )}
