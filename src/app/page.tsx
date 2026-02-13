@@ -12,6 +12,12 @@ const PARTY_FILTERS = [
   { key: '国民民主', label: '国民', color: 'party-tag-dpfp' },
   { key: '共産', label: '共産', color: 'party-tag-jcp' },
   { key: 'れいわ', label: 'れいわ', color: 'party-tag-reiwa' },
+  { key: '参政', label: '参政', color: 'party-tag-sansei' },
+  { key: '保守', label: '保守党', color: 'party-tag-other' },
+  { key: '有志の会', label: '有志', color: 'party-tag-other' },
+  { key: '沖縄の風', label: '沖縄', color: 'party-tag-other' },
+  { key: 'NHK', label: 'NHK', color: 'party-tag-other' },
+  { key: 'みらい', label: 'みらい', color: 'party-tag-mirai' },
   { key: '無所属', label: '無所属', color: 'party-tag-other' },
 ]
 
@@ -77,7 +83,12 @@ export default function Home() {
         if (!matchName && !matchYomi && !matchParty) return false
       }
       if (partyFilter !== 'all') {
-        if (!leg.current_party?.includes(partyFilter)) return false
+        const party = leg.current_party || ''
+        // 全角→半角変換してからマッチ（ＮＨＫ→NHK対応）
+        const normalized = party.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) =>
+          String.fromCharCode(c.charCodeAt(0) - 0xFEE0)
+        )
+        if (!party.includes(partyFilter) && !normalized.includes(partyFilter)) return false
       }
       if (houseFilter !== 'all') {
         if (leg.house !== houseFilter) return false

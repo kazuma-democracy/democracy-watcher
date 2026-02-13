@@ -165,21 +165,23 @@ def record_to_legislator(record: dict) -> dict | None:
 # === Supabase 書き込み ===
 
 def upsert_meetings(meetings: list[dict]):
-    """会議を upsert"""
+    """会議を upsert（既存は更新せずスキップ）"""
     if not meetings:
         return
 
-    # 重複除去
+    # 重複除去（issue_id ベース）
     seen = {}
     for m in meetings:
-        seen[m["id"]] = m
+        seen[m["issue_id"]] = m
     unique = list(seen.values())
 
-    # バッチ upsert (500件ずつ)
+    # INSERT ... ON CONFLICT DO NOTHING（既存の会議は変更しない）
     batch_size = 500
     for i in range(0, len(unique), batch_size):
         batch = unique[i:i + batch_size]
-        supabase.table("meetings").upsert(batch, on_conflict="issue_id").execute()
+        supabase.table("meetings").upsert(
+            batch, on_conflict="issue_id", ignore_duplicates=True
+        ).execute()
     print(f"  会議: {len(unique)}件 upserted")
 
 
