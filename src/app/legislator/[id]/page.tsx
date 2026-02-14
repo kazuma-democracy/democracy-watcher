@@ -323,69 +323,69 @@ export default function LegislatorPage() {
             </div>
           ) : (
             <>
-              {/* カテゴリ別サマリー */}
+              {/* 賛成/反対サマリーバー */}
               {(() => {
-                const catMap: Record<string, { yea: number; nay: number }> = {}
-                for (const pb of partyBills) {
-                  const cat = pb.bill.category || 'その他'
-                  if (!catMap[cat]) catMap[cat] = { yea: 0, nay: 0 }
-                  if (pb.vote === '賛成') catMap[cat].yea++
-                  else catMap[cat].nay++
-                }
-                const sorted = Object.entries(catMap).sort((a, b) => (b[1].yea + b[1].nay) - (a[1].yea + a[1].nay))
-                return sorted.length > 0 ? (
+                const yeaCount = partyBills.filter(pb => pb.vote === '賛成').length
+                const nayCount = partyBills.filter(pb => pb.vote === '反対').length
+                const total = yeaCount + nayCount
+                const yeaPct = total > 0 ? Math.round((yeaCount / total) * 100) : 0
+                return (
                   <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-4 mb-4">
-                    <h3 className="text-xs font-bold text-slate-400 mb-3">政策分野別の賛否傾向</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {sorted.map(([cat, counts]) => (
-                        <div key={cat} className="bg-slate-800/50 rounded-lg px-3 py-1.5 border border-slate-700/40">
-                          <span className="text-xs text-slate-300">{cat}</span>
-                          <span className="text-xs text-emerald-400 ml-2">⭕{counts.yea}</span>
-                          {counts.nay > 0 && <span className="text-xs text-red-400 ml-1">❌{counts.nay}</span>}
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-emerald-400 font-bold">⭕ 賛成 {yeaCount}件</span>
+                      <span className="text-red-400 font-bold">❌ 反対 {nayCount}件</span>
                     </div>
+                    <div className="w-full h-3 bg-slate-700/50 rounded-full overflow-hidden flex">
+                      <div className="h-full bg-emerald-500/70 rounded-l-full" style={{ width: `${yeaPct}%` }} />
+                      <div className="h-full bg-red-500/70 rounded-r-full" style={{ width: `${100 - yeaPct}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2 text-center">
+                      直近{total}件の採決
+                    </p>
                   </div>
-                ) : null
+                )
               })()}
 
-              {/* 賛否リスト */}
-              <div className="space-y-2">
-                {partyBills.map(pb => (
-                  <a
-                    key={pb.bill.id}
-                    href={`/bills/${pb.bill.id}`}
-                    className="flex items-start gap-3 bg-slate-800/40 border border-slate-700/40 rounded-xl p-3 hover:border-slate-600 transition-all"
-                  >
-                    <span className={`text-xs font-bold shrink-0 mt-0.5 ${
-                      pb.vote === '賛成' ? 'text-emerald-400' : 'text-red-400'
-                    }`}>
-                      {pb.vote === '賛成' ? '⭕ 賛成' : '❌ 反対'}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        {pb.bill.category && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-700/40">
-                            {pb.bill.category}
-                          </span>
-                        )}
-                        <span className="text-xs text-slate-500">
-                          第{pb.bill.session}回
-                        </span>
+              {/* スクロール可能な賛否リスト */}
+              <div className="bg-slate-800/20 rounded-xl border border-slate-700/30 overflow-hidden">
+                <div className="max-h-96 overflow-y-auto">
+                  {partyBills.map((pb, i) => (
+                    <a
+                      key={pb.bill.id}
+                      href={`/bills/${pb.bill.id}`}
+                      className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-700/30 transition-colors ${
+                        i > 0 ? 'border-t border-slate-700/20' : ''
+                      }`}
+                    >
+                      <span className={`text-xs font-bold shrink-0 mt-0.5 w-12 ${
+                        pb.vote === '賛成' ? 'text-emerald-400' : 'text-red-400'
+                      }`}>
+                        {pb.vote === '賛成' ? '⭕ 賛成' : '❌ 反対'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-300 leading-snug line-clamp-2">
+                          {pb.bill.bill_name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {pb.bill.category && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-900/30 text-indigo-400 border border-indigo-700/30">
+                              {pb.bill.category}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-600">第{pb.bill.session}回</span>
+                        </div>
                       </div>
-                      <p className="text-sm text-slate-300 leading-relaxed">
-                        {pb.bill.bill_name}
-                      </p>
-                    </div>
-                  </a>
-                ))}
+                    </a>
+                  ))}
+                </div>
+                {partyBills.length >= 50 && (
+                  <div className="px-4 py-2 border-t border-slate-700/30 text-center">
+                    <a href="/bills" className="text-xs text-blue-400 hover:text-blue-300">
+                      全議案を見る →
+                    </a>
+                  </div>
+                )}
               </div>
-
-              {partyBills.length >= 50 && (
-                <p className="text-xs text-slate-500 text-center mt-3">
-                  ※ 最新50件のみ表示
-                </p>
-              )}
             </>
           )}
         </div>
