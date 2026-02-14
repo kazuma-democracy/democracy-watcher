@@ -151,6 +151,34 @@ export default function BillDetailPage() {
           {bill.bill_name}
         </h1>
 
+        {/* カテゴリ + テンプレ要約 */}
+        {(bill.category || bill.summary_template) && (
+          <div className="bg-slate-700/20 rounded-lg p-3 mb-3">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {bill.category && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-700/40">
+                  {bill.category}
+                </span>
+              )}
+              {bill.category_sub && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/40">
+                  {bill.category_sub}
+                </span>
+              )}
+            </div>
+            {bill.summary_template && (
+              <p className="text-sm text-slate-300 leading-relaxed">
+                💡 {bill.summary_template}
+              </p>
+            )}
+            {bill.affected_groups && (
+              <p className="text-xs text-slate-500 mt-2">
+                👥 影響を受ける可能性がある人: {bill.affected_groups}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-4 text-sm text-slate-400 flex-wrap">
           {bill.proposer && <span>📝 提出: {bill.proposer}</span>}
           {bill.proposer_party && <span className="text-slate-500">({bill.proposer_party})</span>}

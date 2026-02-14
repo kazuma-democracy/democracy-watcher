@@ -33,6 +33,7 @@ export default function BillsPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [page, setPage] = useState(0)
   const perPage = 30
 
@@ -63,11 +64,17 @@ export default function BillsPage() {
     setPage(0)
   }
 
-  const paged = bills.slice(page * perPage, (page + 1) * perPage)
-  const totalPages = Math.ceil(bills.length / perPage)
+  const filtered = categoryFilter === 'all'
+    ? bills
+    : bills.filter(b => b.category === categoryFilter)
+  const paged = filtered.slice(page * perPage, (page + 1) * perPage)
+  const totalPages = Math.ceil(filtered.length / perPage)
 
   // 賛否の統計
-  const withVotes = bills.filter(b => b.bill_votes && b.bill_votes.length > 0).length
+  const withVotes = filtered.filter(b => b.bill_votes && b.bill_votes.length > 0).length
+
+  // カテゴリ一覧（データから動的に取得）
+  const categories = Array.from(new Set(bills.map(b => b.category).filter(Boolean))) as string[]
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -135,6 +142,29 @@ export default function BillsPage() {
           </div>
         </div>
 
+        {/* カテゴリフィルター */}
+        {categories.length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-slate-400 shrink-0">政策分野:</label>
+            <select
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setPage(0) }}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="all">全分野</option>
+              {categories.sort().map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            {categoryFilter !== 'all' && (
+              <button
+                onClick={() => { setCategoryFilter('all'); setPage(0) }}
+                className="text-xs text-slate-400 hover:text-slate-200"
+              >✕ 解除</button>
+            )}
+          </div>
+        )}
+
         {/* 検索 */}
         <div className="flex gap-2">
           <input
@@ -164,7 +194,8 @@ export default function BillsPage() {
 
       {/* 統計 */}
       <div className="text-sm text-slate-500 mb-4">
-        {bills.length}件の議案{searchQuery && `（「${searchQuery}」で絞り込み）`}
+        {filtered.length}件の議案{searchQuery && `（「${searchQuery}」で絞り込み）`}
+        {categoryFilter !== 'all' && `（${categoryFilter}）`}
         {withVotes > 0 && ` ・ ${withVotes}件に賛否データあり`}
       </div>
 
@@ -260,6 +291,25 @@ function BillCard({ bill }: { bill: Bill }) {
       <h3 className="text-sm font-bold text-slate-200 mb-2 leading-relaxed">
         {bill.bill_name}
       </h3>
+
+      {/* カテゴリ + テンプレ要約 */}
+      <div className="flex items-start gap-2 mb-2 flex-wrap">
+        {bill.category && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-700/40 shrink-0">
+            {bill.category}
+          </span>
+        )}
+        {bill.category_sub && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/40 shrink-0">
+            {bill.category_sub}
+          </span>
+        )}
+      </div>
+      {bill.summary_template && (
+        <p className="text-xs text-slate-400 mb-2 leading-relaxed">
+          💡 {bill.summary_template}
+        </p>
+      )}
 
       {/* 提出者 */}
       {bill.proposer && (

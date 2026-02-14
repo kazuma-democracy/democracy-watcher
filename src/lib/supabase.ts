@@ -185,6 +185,10 @@ export type Bill = {
   result: string | null
   law_number: string | null
   progress_url: string | null
+  category: string | null
+  category_sub: string | null
+  summary_template: string | null
+  affected_groups: string | null
   bill_votes?: BillVote[]
 }
 
