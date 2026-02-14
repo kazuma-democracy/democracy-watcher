@@ -240,7 +240,7 @@ function BillCard({ bill }: { bill: Bill }) {
   })()
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all">
+    <a href={`/bills/${bill.id}`} className="block bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all cursor-pointer">
       {/* ヘッダー */}
       <div className="flex items-start gap-2 mb-2">
         <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${typeColor}`}>
@@ -258,12 +258,7 @@ function BillCard({ bill }: { bill: Bill }) {
 
       {/* 議案名 */}
       <h3 className="text-sm font-bold text-slate-200 mb-2 leading-relaxed">
-        {bill.progress_url ? (
-          <a href={bill.progress_url} target="_blank" rel="noopener" className="hover:text-blue-300 transition-colors">
-            {bill.bill_name}
-            <span className="text-xs text-slate-500 ml-1">↗</span>
-          </a>
-        ) : bill.bill_name}
+        {bill.bill_name}
       </h3>
 
       {/* 提出者 */}
@@ -311,10 +306,13 @@ function BillCard({ bill }: { bill: Bill }) {
       )}
 
       {/* フッター */}
-      <div className="flex items-center gap-3 text-xs text-slate-600 mt-2">
-        {bill.committee && <span>📋 {bill.committee}委員会</span>}
-        {bill.law_number && <span>📕 {bill.law_number}</span>}
+      <div className="flex items-center justify-between text-xs text-slate-600 mt-2">
+        <div className="flex items-center gap-3">
+          {bill.committee && <span>📋 {bill.committee}委員会</span>}
+          {bill.law_number && <span>📕 {bill.law_number}</span>}
+        </div>
+        <span className="text-slate-500">詳細 →</span>
       </div>
-    </div>
+    </a>
   )
 }

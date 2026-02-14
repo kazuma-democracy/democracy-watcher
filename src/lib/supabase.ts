@@ -234,3 +234,58 @@ export async function getBillSessions(): Promise<number[]> {
   const sessions = Array.from(sessionSet) as number[]
   return sessions.sort((a, b) => b - a)
 }
+
+export async function getBill(id: string): Promise<Bill | null> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select('*, bill_votes(*)')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return data as Bill
+}
+
+/**
+ * 議案名からキーワードを抽出して関連発言を検索
+ * 例: "消費税率の引上げに伴う...法律案" → "消費税" で発言検索
+ */
+export function extractBillKeywords(billName: string): string[] {
+  // 一般的な接尾辞を除去
+  let name = billName
+    .replace(/の一部を改正する法律案$/, '')
+    .replace(/に関する法律案$/, '')
+    .replace(/法律案$/, '')
+    .replace(/に関する件$/, '')
+    .replace(/に関する決議案$/, '')
+    .replace(/等$/, '')
+    .replace(/及び.*$/, '')  // 「及び」以降を除去（長くなりすぎ防止）
+    .trim()
+
+  // 短すぎる場合は元の名前から
+  if (name.length < 4) name = billName.replace(/法律案$/, '').trim()
+
+  return [name]
+}
+
+export async function getRelatedSpeeches(bill: Bill, limit = 30) {
+  const keywords = extractBillKeywords(bill.bill_name)
+  if (keywords.length === 0) return []
+
+  // 議案名のキーワードで発言を検索（同じ国会回次）
+  let query = supabase
+    .from('speeches')
+    .select('id, speaker_name, speaker_group, speaker_position, content, speech_url, date, legislator_id, legislators(id, name, current_party), meetings!inner(id, session, meeting_name, house, date)')
+    .ilike('content', `%${keywords[0]}%`)
+
+  // セッション絞り込み（提出回次ベース）
+  if (bill.submit_session) {
+    query = query.eq('meetings.session', bill.submit_session)
+  }
+
+  const { data, error } = await query
+    .order('date', { ascending: false })
+    .limit(limit)
+
+  if (error) { console.error('Related speeches error:', error); return [] }
+  return data || []
+}
