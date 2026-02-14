@@ -151,8 +151,8 @@ export default function BillDetailPage() {
           {bill.bill_name}
         </h1>
 
-        {/* カテゴリ + テンプレ要約 */}
-        {(bill.category || bill.summary_template) && (
+        {/* カテゴリ + 影響対象 */}
+        {(bill.category || bill.affected_groups) && (
           <div className="bg-slate-700/20 rounded-lg p-3 mb-3">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {bill.category && (
@@ -166,13 +166,8 @@ export default function BillDetailPage() {
                 </span>
               )}
             </div>
-            {bill.summary_template && (
-              <p className="text-sm text-slate-300 leading-relaxed">
-                💡 {bill.summary_template}
-              </p>
-            )}
             {bill.affected_groups && (
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-slate-500">
                 👥 影響を受ける可能性がある人: {bill.affected_groups}
               </p>
             )}

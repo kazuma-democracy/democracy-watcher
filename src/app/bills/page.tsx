@@ -292,7 +292,7 @@ function BillCard({ bill }: { bill: Bill }) {
         {bill.bill_name}
       </h3>
 
-      {/* カテゴリ + テンプレ要約 */}
+      {/* カテゴリ */}
       <div className="flex items-start gap-2 mb-2 flex-wrap">
         {bill.category && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-700/40 shrink-0">
@@ -305,11 +305,6 @@ function BillCard({ bill }: { bill: Bill }) {
           </span>
         )}
       </div>
-      {bill.summary_template && (
-        <p className="text-xs text-slate-400 mb-2 leading-relaxed">
-          💡 {bill.summary_template}
-        </p>
-      )}
 
       {/* 提出者 */}
       {bill.proposer && (
