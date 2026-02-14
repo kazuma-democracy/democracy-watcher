@@ -230,6 +230,7 @@ export async function getBillSessions(): Promise<number[]> {
     .order('session', { ascending: false })
 
   if (error || !data) return []
-  const sessions = [...new Set(data.map((d: any) => d.session).filter(Boolean))] as number[]
+  const sessionSet = new Set(data.map((d: any) => d.session).filter(Boolean))
+  const sessions = Array.from(sessionSet) as number[]
   return sessions.sort((a, b) => b - a)
 }
