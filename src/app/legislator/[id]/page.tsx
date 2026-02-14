@@ -34,7 +34,8 @@ export default function LegislatorPage() {
   const [showCount, setShowCount] = useState(20)
   const [committees, setCommittees] = useState<{name: string; count: number}[]>([])
   const [monthly, setMonthly] = useState<{month: string; count: number}[]>([])
-
+  const [partyBills, setPartyBills] = useState<{bill: any; vote: string}[]>([])
+  const [partyBillsLoading, setPartyBillsLoading] = useState(true)
   useEffect(() => {
     async function load() {
       // 議員情報
@@ -95,6 +96,55 @@ export default function LegislatorPage() {
     }
     load()
   }, [id])
+
+  // 会派の賛否データを取得
+  useEffect(() => {
+    if (!legislator?.current_party) return
+    async function loadPartyBills() {
+      setPartyBillsLoading(true)
+      // 会派名の部分一致で検索（「自由民主党・無所属の会」→「自由民主党」で探す）
+      const partyName = legislator!.current_party!
+      const searchTerms: string[] = [partyName]
+      // 短縮名も追加
+      if (partyName.includes('自由民主党')) searchTerms.push('自由民主党')
+      if (partyName.includes('立憲民主')) searchTerms.push('立憲民主')
+      if (partyName.includes('公明')) searchTerms.push('公明')
+      if (partyName.includes('維新')) searchTerms.push('日本維新')
+      if (partyName.includes('国民民主')) searchTerms.push('国民民主')
+      if (partyName.includes('共産')) searchTerms.push('日本共産')
+      if (partyName.includes('れいわ')) searchTerms.push('れいわ')
+      if (partyName.includes('参政')) searchTerms.push('参政')
+      if (partyName === '社会民主党') searchTerms.push('社会民主')
+
+      // bill_votes から会派名で検索（最新50件）
+      let allVotes: any[] = []
+      for (const term of searchTerms) {
+        const { data } = await supabase
+          .from('bill_votes')
+          .select('vote, bills!inner(id, bill_name, bill_type, status, session, submit_session, bill_number, category, category_sub, progress_url)')
+          .ilike('party_name', `%${term}%`)
+          .order('bill_id', { ascending: false })
+          .limit(60)
+        if (data) allVotes = allVotes.concat(data)
+      }
+
+      // 重複除去（同じbill_id）
+      const seen = new Set<string>()
+      const unique: {bill: any; vote: string}[] = []
+      for (const v of allVotes) {
+        const bill = v.bills as any
+        if (!bill || seen.has(bill.id)) continue
+        seen.add(bill.id)
+        unique.push({ bill, vote: v.vote })
+      }
+
+      // sessionで降順ソート
+      unique.sort((a, b) => (b.bill.session || 0) - (a.bill.session || 0))
+      setPartyBills(unique.slice(0, 50))
+      setPartyBillsLoading(false)
+    }
+    loadPartyBills()
+  }, [legislator])
 
   if (loading) {
     return (
@@ -252,6 +302,94 @@ export default function LegislatorPage() {
           ⚖️ この議員を他の議員と比較する →
         </a>
       </div>
+
+      {/* 所属会派の賛否履歴 */}
+      {legislator.current_party && (
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-slate-100 mb-1">
+            🗳️ 所属会派の賛否履歴
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            {legislator.current_party} としての賛否（※議員個人ではなく会派としての投票）
+          </p>
+
+          {partyBillsLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-pulse text-slate-500 text-sm">賛否データを読み込み中...</div>
+            </div>
+          ) : partyBills.length === 0 ? (
+            <div className="text-center py-8 bg-slate-800/20 rounded-xl border border-slate-700/30">
+              <p className="text-slate-500 text-sm">この会派の賛否データが見つかりませんでした</p>
+            </div>
+          ) : (
+            <>
+              {/* カテゴリ別サマリー */}
+              {(() => {
+                const catMap: Record<string, { yea: number; nay: number }> = {}
+                for (const pb of partyBills) {
+                  const cat = pb.bill.category || 'その他'
+                  if (!catMap[cat]) catMap[cat] = { yea: 0, nay: 0 }
+                  if (pb.vote === '賛成') catMap[cat].yea++
+                  else catMap[cat].nay++
+                }
+                const sorted = Object.entries(catMap).sort((a, b) => (b[1].yea + b[1].nay) - (a[1].yea + a[1].nay))
+                return sorted.length > 0 ? (
+                  <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-4 mb-4">
+                    <h3 className="text-xs font-bold text-slate-400 mb-3">政策分野別の賛否傾向</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {sorted.map(([cat, counts]) => (
+                        <div key={cat} className="bg-slate-800/50 rounded-lg px-3 py-1.5 border border-slate-700/40">
+                          <span className="text-xs text-slate-300">{cat}</span>
+                          <span className="text-xs text-emerald-400 ml-2">⭕{counts.yea}</span>
+                          {counts.nay > 0 && <span className="text-xs text-red-400 ml-1">❌{counts.nay}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              })()}
+
+              {/* 賛否リスト */}
+              <div className="space-y-2">
+                {partyBills.map(pb => (
+                  <a
+                    key={pb.bill.id}
+                    href={`/bills/${pb.bill.id}`}
+                    className="flex items-start gap-3 bg-slate-800/40 border border-slate-700/40 rounded-xl p-3 hover:border-slate-600 transition-all"
+                  >
+                    <span className={`text-xs font-bold shrink-0 mt-0.5 ${
+                      pb.vote === '賛成' ? 'text-emerald-400' : 'text-red-400'
+                    }`}>
+                      {pb.vote === '賛成' ? '⭕ 賛成' : '❌ 反対'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        {pb.bill.category && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-700/40">
+                            {pb.bill.category}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-500">
+                          第{pb.bill.session}回
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        {pb.bill.bill_name}
+                      </p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+
+              {partyBills.length >= 50 && (
+                <p className="text-xs text-slate-500 text-center mt-3">
+                  ※ 最新50件のみ表示
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* 発言一覧 */}
       <div className="mb-4 flex items-center justify-between">
