@@ -229,7 +229,7 @@ export default function RankingsPage() {
                             {partyShort}
                           </span>
                           {getHouseLabel(r.house)}
-                          {r.current_position && (() => { const pd = getPositionDisplay(r); return pd.label ? <span className={`ml-1 ${pd.isOverride ? 'text-amber-400/70' : 'text-amber-400/40 italic'}`}>{pd.label}</span> : null })()}
+                          {(() => { const pd = getPositionDisplay(r); return pd.label ? <span className={`ml-1 ${pd.isOverride ? 'text-amber-400/70' : 'text-amber-400/40 italic'}`}>{pd.label}</span> : null })()}
                         </div>
                       </a>
                     </td>
