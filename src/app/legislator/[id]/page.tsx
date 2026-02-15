@@ -37,6 +37,7 @@ export default function LegislatorPage() {
   const [partyBills, setPartyBills] = useState<{bill: any; vote: string}[]>([])
   const [partyBillsLoading, setPartyBillsLoading] = useState(true)
   const [reportCard, setReportCard] = useState<any>(null)
+  const [scandals, setScandals] = useState<any[]>([])
   useEffect(() => {
     async function load() {
       // 議員情報
@@ -100,6 +101,19 @@ export default function LegislatorPage() {
         .eq('legislator_id', id)
         .single()
       if (rc) setReportCard(rc)
+
+      // 不祥事データ
+      const { data: scandalPeople } = await supabase
+        .from('scandal_people')
+        .select('*, scandals(*), scandals!inner(is_published)')
+        .eq('legislator_id', id)
+        .eq('scandals.is_published', true)
+      if (scandalPeople) {
+        const scandalList = scandalPeople
+          .filter((sp: any) => sp.scandals)
+          .map((sp: any) => ({ ...sp.scandals, role: sp.role }))
+        setScandals(scandalList)
+      }
 
       setLoading(false)
     }
@@ -319,7 +333,55 @@ export default function LegislatorPage() {
       {/* ③ 関連ニュース */}
       <LegislatorNewsSection name={legislator.name} party={legislator.current_party} />
 
-      {/* ③ 国会発言（タブ式キーワード検索） */}
+      {/* ④ 不祥事・問題の記録 */}
+      {scandals.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-100">⚠️ 問題・疑惑の記録</h2>
+            <a href="/scandals" className="text-xs text-blue-400/70 hover:text-blue-400 transition-colors">
+              全件を見る →
+            </a>
+          </div>
+          <div className="bg-red-900/10 border border-red-700/20 rounded-xl overflow-hidden">
+            <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/20">
+              <p className="text-xs text-red-400/60">
+                ⚠️ 報道ベースの記録です。「疑惑」は事実認定を意味しません。
+              </p>
+            </div>
+            {scandals.map((sc: any, i: number) => {
+              const sevMap: Record<string, { label: string; cls: string }> = {
+                allegation: { label: '疑惑', cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
+                investigation: { label: '調査中', cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40' },
+                confirmed: { label: '確認済', cls: 'bg-red-500/20 text-red-400 border-red-500/40' },
+                convicted: { label: '有罪', cls: 'bg-red-600/20 text-red-500 border-red-600/40' },
+              }
+              const sev = sevMap[sc.severity] || sevMap.allegation
+              const catMap: Record<string, string> = {
+                political_funds: '💰 政治資金', election_violation: '🗳️ 選挙違反',
+                corruption: '🏴 汚職', harassment: '🚫 ハラスメント',
+                cult_relations: '⛪ 旧統一教会', ethics: '⚖️ 倫理',
+                tax_evasion: '📑 脱税', violence: '👊 暴力', other: '📌 その他',
+              }
+              return (
+                <div key={sc.id} className={`px-4 py-3 ${i > 0 ? 'border-t border-red-700/15' : ''}`}>
+                  <div className="flex items-start gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded border shrink-0 ${sev.cls}`}>{sev.label}</span>
+                    <div className="min-w-0">
+                      <span className="text-sm text-slate-200 font-medium">{sc.title}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-slate-500">{catMap[sc.category] || sc.category}</span>
+                        {sc.start_date && <span className="text-xs text-slate-600">{sc.start_date}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ⑤ 国会発言（タブ式キーワード検索） */}
       <LegislatorSpeechesSection legislatorId={id} totalCount={speechCount} />
 
       {/* ④ グラフセクション（月別発言数・委員会別） */}

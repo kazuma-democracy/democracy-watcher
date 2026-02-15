@@ -51,6 +51,9 @@ export default function RootLayout({
               <a href="/analysis" className="text-slate-300 hover:text-white transition-colors">
                 分析
               </a>
+              <a href="/scandals" className="text-red-400/80 hover:text-red-300 transition-colors">
+                不祥事
+              </a>
             </nav>
           </div>
         </header>
