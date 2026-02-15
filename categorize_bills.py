@@ -11,17 +11,52 @@ categorize_bills.py - 議案名からカテゴリ・テンプレ要約・影響�
 import os
 import sys
 import re
+import time
 import argparse
 from supabase import create_client
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
+# .env.localから読み込み
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("ERROR: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
+    env_paths = ['.env.local', '../.env.local']
+    for ep in env_paths:
+        if os.path.exists(ep):
+            with open(ep, encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('NEXT_PUBLIC_SUPABASE_URL='):
+                        SUPABASE_URL = SUPABASE_URL or line.split('=', 1)[1].strip('"\'')
+                    elif line.startswith('SUPABASE_SERVICE_ROLE_KEY='):
+                        SUPABASE_KEY = SUPABASE_KEY or line.split('=', 1)[1].strip('"\'')
+            break
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("ERROR: Supabase接続情報が見つかりません")
+    print("  .env.local に NEXT_PUBLIC_SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY を設定してください")
+    print("  または環境変数 SUPABASE_URL / SUPABASE_SERVICE_KEY を設定してください")
     sys.exit(1)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+def retry_update(table, data, bill_id, max_retries=5):
+    """リトライ付きでDB更新。失敗時は指数バックオフで待機"""
+    for attempt in range(max_retries):
+        try:
+            supabase.table(table).update(data).eq("id", bill_id).execute()
+            return True
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt * 5  # 5s, 10s, 20s, 40s, 80s
+                print(f"    ⚠️ エラー (試行{attempt+1}/{max_retries}): {str(e)[:80]}")
+                print(f"    💤 {wait}秒待機中...")
+                time.sleep(wait)
+            else:
+                print(f"    ❌ {max_retries}回失敗: {bill_id}")
+                return False
+    return False
 
 # ============================================
 # 政策カテゴリ辞書
@@ -296,10 +331,20 @@ def main():
     offset = 0
     page_size = 1000
     while True:
-        result = supabase.table("bills") \
-            .select("id, bill_name, bill_type") \
-            .range(offset, offset + page_size - 1) \
-            .execute()
+        for attempt in range(5):
+            try:
+                result = supabase.table("bills") \
+                    .select("id, bill_name, bill_type") \
+                    .range(offset, offset + page_size - 1) \
+                    .execute()
+                break
+            except Exception as e:
+                wait = 2 ** attempt * 3
+                print(f"  ⚠️ 取得エラー (試行{attempt+1}/5): {str(e)[:60]}... {wait}秒待機")
+                time.sleep(wait)
+        else:
+            print("  ❌ データ取得に失敗。中断します。")
+            sys.exit(1)
         rows = result.data or []
         all_bills.extend(rows)
         if len(rows) < page_size:
@@ -353,21 +398,29 @@ def main():
 
     # DB更新
     print(f"\n--- DB更新中 ---")
+    success = 0
+    failed = 0
     batch_size = 200
     for i in range(0, len(updates), batch_size):
         batch = updates[i:i + batch_size]
         for item in batch:
-            supabase.table("bills").update({
+            ok = retry_update("bills", {
                 "category": item["category"],
                 "category_sub": item["category_sub"],
                 "summary_template": item["summary_template"],
                 "affected_groups": item["affected_groups"],
-            }).eq("id", item["id"]).execute()
+            }, item["id"])
+            if ok:
+                success += 1
+            else:
+                failed += 1
         done = min(i + batch_size, len(updates))
         if done % 500 < batch_size:
-            print(f"  更新: {done}/{len(updates)}")
+            print(f"  更新: {done}/{len(updates)} (成功:{success} 失敗:{failed})")
+        # バッチ間に少し休憩（Supabase過負荷防止）
+        time.sleep(0.5)
 
-    print(f"\n✅ 分類完了! {categorized}件にカテゴリを付与しました")
+    print(f"\n✅ 分類完了! 成功:{success}件 失敗:{failed}件")
 
 
 if __name__ == "__main__":

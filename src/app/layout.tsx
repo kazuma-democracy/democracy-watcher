@@ -42,6 +42,9 @@ export default function RootLayout({
               <a href="/stats" className="text-slate-300 hover:text-white transition-colors">
                 統計
               </a>
+              <a href="/analysis" className="text-slate-300 hover:text-white transition-colors">
+                分析
+              </a>
             </nav>
           </div>
         </header>
