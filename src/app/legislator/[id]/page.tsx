@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase, Legislator, getPartyClass, getPartyShortName } from '@/lib/supabase'
+import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
 
 type SpeechWithMeeting = {
   id: string
@@ -105,13 +105,13 @@ export default function LegislatorPage() {
       // 不祥事データ
       const { data: scandalPeople } = await supabase
         .from('scandal_people')
-        .select('role, scandals!inner(id, title, category, severity, start_date, summary, is_published)')
+        .select('*, scandals(*), scandals!inner(is_published)')
         .eq('legislator_id', id)
         .eq('scandals.is_published', true)
       if (scandalPeople) {
         const scandalList = scandalPeople
           .filter((sp: any) => sp.scandals)
-          .map((sp: any) => ({ ...(sp.scandals as any), role: sp.role }))
+          .map((sp: any) => ({ ...sp.scandals, role: sp.role }))
         setScandals(scandalList)
       }
 
@@ -233,7 +233,7 @@ export default function LegislatorPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <div className="text-xs text-slate-500 mb-1">所属院</div>
-              <div className="text-sm text-slate-200">{legislator.house || '不明'}</div>
+              <div className="text-sm text-slate-200">{getHouseLabel(legislator.house)}</div>
             </div>
             <div>
               <div className="text-xs text-slate-500 mb-1">会派</div>
@@ -343,7 +343,7 @@ export default function LegislatorPage() {
               }`}>
                 上位{100 - reportCard.speech_rank_pct}%
               </span>
-              <p className="text-xs text-slate-500">{reportCard.house}内 発言ランキング</p>
+              <p className="text-xs text-slate-500">{getHouseLabel(reportCard.house)}内 発言ランキング</p>
             </div>
           </div>
 
@@ -948,7 +948,7 @@ function LegislatorSpeechesSection({ legislatorId, totalCount }: { legislatorId:
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-slate-400">{sp.date}</span>
                       <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
-                        {sp.meetings?.house} {sp.meetings?.meeting_name}
+                        {getHouseLabel(sp.meetings?.house)} {sp.meetings?.meeting_name}
                       </span>
                       {sp.speaker_position && <span className="text-amber-400/80">{sp.speaker_position}</span>}
                     </div>

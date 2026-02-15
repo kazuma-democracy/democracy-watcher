@@ -923,7 +923,7 @@ export default function AdminScandalsPage() {
                     <div className="mt-1 max-h-[200px] overflow-y-auto">
                       {dbDiag.sample.map((leg: any) => (
                         <p key={leg.id} className="text-xs text-slate-500">
-                          {leg.name} ({leg.house}) {leg.current_party}
+                          {leg.name} ({leg.house === 'representatives' ? '衆議院' : leg.house === 'councillors' ? '参議院' : leg.house}) {leg.current_party}
                         </p>
                       ))}
                     </div>

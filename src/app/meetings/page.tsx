@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getHouseLabel } from '@/lib/supabase'
 
 type MeetingWithCount = {
   id: string
@@ -144,9 +144,9 @@ export default function MeetingsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs px-2 py-0.5 rounded ${
-                        m.house === '衆議院' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50' : 'bg-purple-900/50 text-purple-300 border border-purple-700/50'
+                        getHouseLabel(m.house) === '衆議院' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50' : 'bg-purple-900/50 text-purple-300 border border-purple-700/50'
                       }`}>
-                        {m.house}
+                        {getHouseLabel(m.house)}
                       </span>
                       <h3 className="text-sm font-bold text-slate-200">{m.meeting_name}</h3>
                       {m.issue_number && <span className="text-xs text-slate-500">{m.issue_number}</span>}

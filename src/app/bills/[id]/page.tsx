@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { getBill, getRelatedSpeeches, extractBillKeywords, getPartyClass, getPartyShortName } from '@/lib/supabase'
+import { getBill, getRelatedSpeeches, extractBillKeywords, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
 import type { Bill } from '@/lib/supabase'
 
 type RelatedSpeech = {
@@ -190,7 +190,7 @@ export default function BillDetailPage() {
               rel="noopener noreferrer"
               className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-3 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
             >
-              {bill.house === '参議院' ? '参議院 議案情報' : '衆議院 経過情報'} ↗
+              {getHouseLabel(bill.house) === '参議院' ? '参議院 議案情報' : '衆議院 経過情報'} ↗
             </a>
           )}
         </div>
@@ -272,11 +272,11 @@ export default function BillDetailPage() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      meeting.house === '衆議院'
+                      getHouseLabel(meeting.house) === '衆議院'
                         ? 'bg-blue-900/50 text-blue-300'
                         : 'bg-purple-900/50 text-purple-300'
                     }`}>
-                      {meeting.house}
+                      {getHouseLabel(meeting.house)}
                     </span>
                     <span className="text-sm font-medium text-slate-300">{meeting.meeting_name}</span>
                     <span className="text-xs text-slate-500">{meeting.date}</span>

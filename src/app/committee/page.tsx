@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { supabase, getPartyClass, getPartyShortName } from '@/lib/supabase'
+import { supabase, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
 
 // 注目委員会プリセット
 const FEATURED_COMMITTEES = [
@@ -530,7 +530,7 @@ function CommitteeWatchPage() {
                       <div className="flex items-center gap-3 text-xs">
                         <span className="text-slate-400">{sp.date || sp.meetings?.date}</span>
                         <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
-                          {sp.meetings?.house}
+                          {getHouseLabel(sp.meetings?.house)}
                         </span>
                         {sp.legislators?.id ? (
                           <a href={`/legislator/${sp.legislators.id}`}

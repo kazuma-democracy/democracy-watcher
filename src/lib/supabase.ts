@@ -91,6 +91,13 @@ export function getPartyShortName(party: string | null): string {
   return party
 }
 
+export function getHouseLabel(house: string | null): string {
+  if (!house) return '不明'
+  if (house === 'representatives' || house === '衆議院') return '衆議院'
+  if (house === 'councillors' || house === '参議院') return '参議院'
+  return house
+}
+
 // === データ取得関数 ===
 
 export async function getLegislatorsWithCounts() {

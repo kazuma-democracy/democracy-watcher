@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, getPartyClass, getPartyShortName } from '@/lib/supabase'
+import { supabase, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
 
 type RankingEntry = {
   legislator_id: string
@@ -165,7 +165,7 @@ export default function RankingsPage() {
                     <span className="text-xl">{medals[i]}</span>
                     <div>
                       <div className="text-white font-bold">{r.name}</div>
-                      <div className="text-white/60 text-xs">{getPartyShortName(r.current_party)} · {r.house}</div>
+                      <div className="text-white/60 text-xs">{getPartyShortName(r.current_party)} · {getHouseLabel(r.house)}</div>
                     </div>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export default function RankingsPage() {
                           <span className={`inline-block px-1.5 py-0.5 rounded text-xs mr-1 party-${getPartyClass(r.current_party)} text-white/90`}>
                             {partyShort}
                           </span>
-                          {r.house}
+                          {getHouseLabel(r.house)}
                           {r.current_position && <span className="text-amber-400/70 ml-1">{r.current_position}</span>}
                         </div>
                       </a>

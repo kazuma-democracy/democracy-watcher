@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase, getPartyClass, getPartyShortName } from '@/lib/supabase'
+import { supabase, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
 
 type MeetingDetail = {
   id: string
@@ -104,11 +104,11 @@ export default function MeetingDetailPage() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className={`text-xs px-2 py-0.5 rounded ${
-                meeting.house === '衆議院'
+                getHouseLabel(meeting.house) === '衆議院'
                   ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50'
                   : 'bg-purple-900/50 text-purple-300 border border-purple-700/50'
               }`}>
-                {meeting.house}
+                {getHouseLabel(meeting.house)}
               </span>
               {meeting.issue_number && <span className="text-xs text-slate-500">{meeting.issue_number}</span>}
             </div>
@@ -131,6 +131,9 @@ export default function MeetingDetailPage() {
           )}
         </div>
       </div>
+
+      {/* 関連ニュース */}
+      <MeetingNewsSection meetingName={meeting.meeting_name} date={meeting.date} />
 
       {/* 発言者サマリー */}
       {(() => {
@@ -236,6 +239,97 @@ export default function MeetingDetailPage() {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ===== 関連ニュースコンポーネント =====
+function MeetingNewsSection({ meetingName, date }: { meetingName: string; date: string }) {
+  const [articles, setArticles] = useState<{ title: string; url: string; source: string; date: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  // 委員会名からキーワード生成（「予算委員会」→「予算委員会 国会」）
+  const keyword = meetingName.replace(/第?\d+号$/, '').trim()
+
+  useEffect(() => {
+    async function fetchNews() {
+      try {
+        const res = await fetch(`/api/news?q=${encodeURIComponent(keyword + ' 国会')}`)
+        const data = await res.json()
+        setArticles(data.articles || [])
+      } catch {
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchNews()
+  }, [keyword])
+
+  return (
+    <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
+      <h2 className="text-sm font-bold text-slate-300 mb-3">📰 関連ニュース</h2>
+
+      {loading && (
+        <div className="animate-pulse space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-10 bg-slate-700/30 rounded-lg" />
+          ))}
+        </div>
+      )}
+
+      {!loading && articles.length > 0 && (
+        <div className="space-y-1.5 mb-3">
+          {articles.map((a, i) => (
+            <a
+              key={i}
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700/30 transition-colors group"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-200 leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">
+                  {a.title}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  {a.source && <span className="text-xs text-slate-500">{a.source}</span>}
+                  {a.date && <span className="text-xs text-slate-600">{a.date}</span>}
+                </div>
+              </div>
+              <span className="text-xs text-slate-600 shrink-0 mt-1">↗</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {!loading && articles.length === 0 && !error && (
+        <p className="text-xs text-slate-500 mb-3">関連するニュースが見つかりませんでした</p>
+      )}
+
+      {error && (
+        <p className="text-xs text-slate-500 mb-3">ニュースの取得に失敗しました</p>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700/30">
+        <a
+          href={`https://news.google.com/search?q=${encodeURIComponent(keyword)}&hl=ja&gl=JP&ceid=JP:ja`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-2.5 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
+        >
+          📰 Google Newsで詳しく ↗
+        </a>
+        <a
+          href={`https://x.com/search?q=${encodeURIComponent(keyword)}&f=live`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-2.5 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
+        >
+          𝕏 ポストを検索 ↗
+        </a>
       </div>
     </div>
   )

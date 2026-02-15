@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, Legislator, getPartyClass, getPartyShortName, getLegislatorsWithCounts, getStats, searchSpeeches } from '@/lib/supabase'
+import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel, getLegislatorsWithCounts, getStats, searchSpeeches } from '@/lib/supabase'
 
 const PARTY_FILTERS = [
   { key: 'all', label: '全政党', color: 'text-slate-300 border-slate-500' },
@@ -31,7 +31,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('')
   const [committedQuery, setCommittedQuery] = useState('')
   const [partyFilter, setPartyFilter] = useState('all')
-  const [houseFilter, setHouseFilter] = useState<'all' | '衆議院' | '参議院'>('all')
+  const [houseFilter, setHouseFilter] = useState<'all' | 'representatives' | 'councillors'>('all')
   const [sortMode, setSortMode] = useState<SortMode>('speeches')
   const [searchMode, setSearchMode] = useState<SearchMode>('legislator')
   const [speechResults, setSpeechResults] = useState<any[]>([])
@@ -243,7 +243,7 @@ export default function Home() {
                         </span>
                         <span className="text-slate-500">{sp.date}</span>
                         <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-400">
-                          {sp.meetings?.house} {sp.meetings?.meeting_name}
+                          {getHouseLabel(sp.meetings?.house)} {sp.meetings?.meeting_name}
                         </span>
                       </div>
                       <p className="text-sm text-slate-400 leading-relaxed">
@@ -289,15 +289,15 @@ export default function Home() {
         <div className="w-full sm:w-auto" />
         {/* 院フィルター */}
         <div className="flex gap-1 mr-2">
-          {(['all', '衆議院', '参議院'] as const).map((house) => (
+          {([{key: 'all', label: '全院'}, {key: 'representatives', label: '衆議院'}, {key: 'councillors', label: '参議院'}] as const).map((house) => (
             <button
-              key={house}
-              onClick={() => setHouseFilter(house)}
+              key={house.key}
+              onClick={() => setHouseFilter(house.key as any)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                houseFilter === house ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                houseFilter === house.key ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              {house === 'all' ? '全院' : house}
+              {house.label}
             </button>
           ))}
         </div>
@@ -371,7 +371,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-400 mt-3 flex-wrap">
                 <span className="bg-slate-700/50 px-2 py-0.5 rounded">
-                  {leg.house || '不明'}
+                  {getHouseLabel(leg.house)}
                 </span>
                 {position && (
                   <span className="text-amber-400/80 truncate max-w-[200px]" title={leg.current_position || ''}>
