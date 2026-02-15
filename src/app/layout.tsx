@@ -45,6 +45,9 @@ export default function RootLayout({
               <a href="/committee" className="text-slate-300 hover:text-white transition-colors">
                 委員会
               </a>
+              <a href="/kenpou" className="text-slate-300 hover:text-white transition-colors">
+                憲法審査会
+              </a>
               <a href="/stats" className="text-slate-300 hover:text-white transition-colors">
                 統計
               </a>

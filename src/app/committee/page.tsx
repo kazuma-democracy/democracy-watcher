@@ -6,7 +6,6 @@ import { supabase, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib
 
 // 注目委員会プリセット
 const FEATURED_COMMITTEES = [
-  { key: '憲法審査会', label: '憲法審査会', icon: '📜', description: '憲法改正の議論を行う機関' },
   { key: '予算委員会', label: '予算委員会', icon: '💰', description: '国家予算の審議・政府への質疑' },
   { key: '政治倫理の確立及び選挙制度に関する特別委員会', label: '政治倫理・選挙', icon: '⚖️', description: '政治倫理と選挙制度の審議' },
   { key: '政治倫理審査会', label: '政治倫理審査会', icon: '🔍', description: '議員の政治倫理を審査' },
@@ -63,7 +62,7 @@ export default function CommitteeWatchWrapper() {
 function CommitteeWatchPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const committeeName = searchParams.get('name') || '憲法審査会'
+  const committeeName = searchParams.get('name') || '予算委員会'
 
   const [meetings, setMeetings] = useState<any[]>([])
   const [speeches, setSpeeches] = useState<any[]>([])
@@ -205,24 +204,6 @@ function CommitteeWatchPage() {
     )
   }, [speeches, speechFilter, speechTabs])
 
-  // 開催されなかった月の検出
-  const inactiveMonths = useMemo(() => {
-    if (monthlyMeetings.length < 2) return []
-    const inactive: string[] = []
-    const start = monthlyMeetings[0].month
-    const end = monthlyMeetings[monthlyMeetings.length - 1].month
-    const activeSet = new Set(monthlyMeetings.map(m => m.month))
-
-    let current = start
-    while (current <= end) {
-      if (!activeSet.has(current)) inactive.push(current)
-      const [y, m] = current.split('-').map(Number)
-      const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
-      current = next
-    }
-    return inactive
-  }, [monthlyMeetings])
-
   function truncate(text: string | null, len = 200) {
     if (!text) return ''
     const cleaned = text.replace(/^○.+?　/, '')
@@ -320,23 +301,6 @@ function CommitteeWatchPage() {
           <div className="text-xs text-slate-500">参加政党数</div>
         </div>
       </div>
-
-      {/* 開催されなかった月の警告 */}
-      {inactiveMonths.length > 0 && (
-        <div className="bg-red-900/20 border border-red-700/30 rounded-lg px-4 py-3 mb-6">
-          <p className="text-xs text-red-400/90 font-medium mb-1">
-            🚨 開催されなかった月（{inactiveMonths.length}ヶ月）
-          </p>
-          <p className="text-xs text-red-400/70">
-            {inactiveMonths.slice(0, 12).join('、')}{inactiveMonths.length > 12 ? ` 他${inactiveMonths.length - 12}ヶ月` : ''}
-          </p>
-          {isKenpou && (
-            <p className="text-xs text-red-400/50 mt-1">
-              ※ 憲法審査会が開かれないこと自体が政治的判断です
-            </p>
-          )}
-        </div>
-      )}
 
       {/* 分析タブ */}
       <div className="flex gap-1.5 mb-4">
