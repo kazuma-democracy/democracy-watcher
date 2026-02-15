@@ -951,7 +951,7 @@ function LegislatorSpeechesSection({ legislatorId, totalCount }: { legislatorId:
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-slate-400">{sp.date}</span>
                       <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
-                        {getHouseLabel(sp.meetings?.house)} {sp.meetings?.meeting_name}
+                        {getHouseLabel(sp.meetings?.house ?? null)} {sp.meetings?.meeting_name}
                       </span>
                       {sp.speaker_position && <span className="text-amber-400/80">{sp.speaker_position}</span>}
                     </div>
