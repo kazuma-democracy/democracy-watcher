@@ -112,7 +112,7 @@ export default function AnalysisPage() {
   }
 
   // ===== ヒートマップ用データ整理 =====
-  const hmParties = sortParties([...new Set(catVotes.map(v => v.party_name))]).slice(0, 10)
+  const hmParties = sortParties(Array.from(new Set(catVotes.map(v => v.party_name)))).slice(0, 10)
   const catTotals: Record<string, number> = {}
   for (const v of catVotes) {
     catTotals[v.category] = (catTotals[v.category] || 0) + v.n_votes
@@ -125,10 +125,10 @@ export default function AnalysisPage() {
   }
 
   // ===== 一致率用データ整理 =====
-  const agParties = sortParties([...new Set([
+  const agParties = sortParties(Array.from(new Set([
     ...pairData.map(p => p.party_a),
     ...pairData.map(p => p.party_b),
-  ])]).slice(0, 10)
+  ]))).slice(0, 10)
 
   const agLookup: Record<string, PairAgreement> = {}
   for (const p of pairData) {
