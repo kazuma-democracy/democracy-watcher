@@ -319,86 +319,8 @@ export default function LegislatorPage() {
       {/* ③ 関連ニュース */}
       <LegislatorNewsSection name={legislator.name} party={legislator.current_party} />
 
-      {/* ③ 国会発言（スクロール式） */}
-      <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-100">
-            💬 国会発言
-          </h2>
-          <span className="text-sm text-slate-500">{speechCount}件（新しい順）</span>
-        </div>
-
-        {speeches.length > 0 ? (
-          <div className="bg-slate-800/20 rounded-xl border border-slate-700/30 overflow-hidden">
-            <div className="max-h-[500px] overflow-y-auto">
-              {speeches.slice(0, showCount).map((sp, i) => {
-                const isExpanded = expandedSpeech === sp.id
-                return (
-                  <div
-                    key={sp.id}
-                    className={`${i > 0 ? 'border-t border-slate-700/20' : ''}`}
-                  >
-                    <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700/10">
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className="text-slate-400">{sp.date}</span>
-                        <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
-                          {sp.meetings?.house} {sp.meetings?.meeting_name}
-                        </span>
-                        {sp.speaker_position && (
-                          <span className="text-amber-400/80">{sp.speaker_position}</span>
-                        )}
-                      </div>
-                      <a
-                        href={sp.speech_url || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-400/60 hover:text-blue-400 transition-colors"
-                      >
-                        原文 ↗
-                      </a>
-                    </div>
-                    <div
-                      className="px-4 py-3 cursor-pointer hover:bg-slate-700/20 transition-colors"
-                      onClick={() => setExpandedSpeech(isExpanded ? null : sp.id)}
-                    >
-                      {sp.ai_summary && (
-                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3 text-sm text-blue-200">
-                          <span className="text-xs text-blue-400 font-medium">🤖 AI要約：</span>
-                          <span className="ml-2">{sp.ai_summary}</span>
-                        </div>
-                      )}
-                      <p className="text-sm text-slate-300 leading-relaxed">
-                        {isExpanded ? sp.content?.replace(/^○.+?　/, '') : truncate(sp.content)}
-                      </p>
-                      {(sp.content?.length || 0) > 200 && (
-                        <button className="text-xs text-blue-400/60 hover:text-blue-400 mt-2 transition-colors">
-                          {isExpanded ? '▲ 閉じる' : '▼ 全文を表示'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            {showCount < speeches.length && (
-              <div className="text-center py-3 border-t border-slate-700/30">
-                <button
-                  onClick={() => setShowCount((prev) => prev + 20)}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  もっと読み込む
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-700/30">
-            <div className="text-3xl mb-3">📭</div>
-            <p className="text-slate-400">発言データがまだありません</p>
-            <p className="text-slate-500 text-sm mt-1">データ収集中です。しばらくお待ちください。</p>
-          </div>
-        )}
-      </div>
+      {/* ③ 国会発言（タブ式キーワード検索） */}
+      <LegislatorSpeechesSection legislatorId={id} totalCount={speechCount} />
 
       {/* ④ グラフセクション（月別発言数・委員会別） */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -772,6 +694,237 @@ function LegislatorNewsSection({ name, party }: { name: string; party: string | 
           𝕏 ポストを検索 ↗
         </a>
       </div>
+    </div>
+  )
+}
+
+// ===== 発言タブ式キーワード検索コンポーネント =====
+const SPEECH_TABS = [
+  { key: 'all', label: '全件', icon: '📋', keywords: [] as string[] },
+  { key: 'budget', label: '予算・財政', icon: '💰', keywords: ['予算', '財政', '税', '歳出', '歳入', '国債'] },
+  { key: 'security', label: '安全保障', icon: '🛡️', keywords: ['安全保障', '防衛', '自衛隊', '外交', '安保', '米軍'] },
+  { key: 'welfare', label: '社会保障', icon: '🏥', keywords: ['年金', '医療', '介護', '福祉', '保険', '少子化'] },
+  { key: 'economy', label: '経済・雇用', icon: '📈', keywords: ['経済', '雇用', '賃金', '物価', '金融', '中小企業'] },
+  { key: 'scandal', label: '疑惑追及', icon: '⚠️', keywords: ['裏金', '不正', '疑惑', '政治資金', '説明責任', '責任'] },
+]
+
+type SpeechTabData = { speeches: SpeechWithMeeting[]; count: number }
+
+function LegislatorSpeechesSection({ legislatorId, totalCount }: { legislatorId: string; totalCount: number }) {
+  const [activeTab, setActiveTab] = useState('all')
+  const [cache, setCache] = useState<Record<string, SpeechTabData>>({})
+  const [loadingTab, setLoadingTab] = useState<string | null>(null)
+  const [expandedSpeech, setExpandedSpeech] = useState<string | null>(null)
+  const [showCount, setShowCount] = useState(20)
+  const [customInput, setCustomInput] = useState('')
+  const [customKeyword, setCustomKeyword] = useState('')
+
+  useEffect(() => { fetchTab('all') }, [legislatorId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function fetchTab(tabKey: string) {
+    setActiveTab(tabKey)
+    setShowCount(20)
+    setExpandedSpeech(null)
+    if (cache[tabKey]) return
+
+    setLoadingTab(tabKey)
+    try {
+      let keywords: string[] = []
+      if (tabKey === 'custom') {
+        keywords = [customKeyword]
+      } else {
+        const tab = SPEECH_TABS.find(t => t.key === tabKey)
+        keywords = tab?.keywords || []
+      }
+
+      let query = supabase
+        .from('speeches')
+        .select('*, meetings(meeting_name, house, date)')
+        .eq('legislator_id', legislatorId)
+        .order('date', { ascending: false })
+
+      if (keywords.length > 0) {
+        const orFilter = keywords.map(k => `content.ilike.%${k}%`).join(',')
+        query = query.or(orFilter)
+      }
+
+      const { data } = await query.limit(100)
+      setCache(prev => ({
+        ...prev,
+        [tabKey]: { speeches: (data || []) as SpeechWithMeeting[], count: data?.length || 0 }
+      }))
+    } catch (err) {
+      console.error('Speech fetch error:', err)
+    } finally {
+      setLoadingTab(null)
+    }
+  }
+
+  function handleCustomSearch() {
+    if (!customInput.trim()) return
+    setCustomKeyword(customInput.trim())
+    setCache(prev => { const next = { ...prev }; delete next['custom']; return next })
+    setActiveTab('custom')
+    setTimeout(() => fetchCustom(customInput.trim()), 0)
+  }
+
+  async function fetchCustom(kw: string) {
+    setLoadingTab('custom')
+    setShowCount(20)
+    try {
+      const { data } = await supabase
+        .from('speeches')
+        .select('*, meetings(meeting_name, house, date)')
+        .eq('legislator_id', legislatorId)
+        .ilike('content', `%${kw}%`)
+        .order('date', { ascending: false })
+        .limit(100)
+      setCache(prev => ({
+        ...prev,
+        custom: { speeches: (data || []) as SpeechWithMeeting[], count: data?.length || 0 }
+      }))
+    } catch (err) { console.error(err) }
+    finally { setLoadingTab(null) }
+  }
+
+  function truncateSpeech(text: string | null, len = 200) {
+    if (!text) return ''
+    const cleaned = text.replace(/^○.+?　/, '')
+    return cleaned.length <= len ? cleaned : cleaned.substring(0, len) + '...'
+  }
+
+  const current = cache[activeTab]
+  const speeches = current?.speeches || []
+  const isLoading = loadingTab === activeTab
+  const displayCount = activeTab === 'all' ? totalCount : (current?.count ?? 0)
+
+  return (
+    <div className="mb-8">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-bold text-slate-100">💬 国会発言</h2>
+        <span className="text-sm text-slate-500">{isLoading ? '...' : `${displayCount}件`}（新しい順）</span>
+      </div>
+
+      {/* タブ */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {SPEECH_TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => fetchTab(tab.key)}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+              activeTab === tab.key
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+        {customKeyword && (
+          <button
+            onClick={() => fetchTab('custom')}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+              activeTab === 'custom'
+                ? 'bg-purple-600 border-purple-500 text-white'
+                : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🔎 {customKeyword.length > 8 ? customKeyword.slice(0, 8) + '…' : customKeyword}
+          </button>
+        )}
+      </div>
+
+      {/* カスタム検索 */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={customInput}
+          onChange={e => setCustomInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleCustomSearch() }}
+          placeholder="発言内のキーワードで検索（例: 裏金, 憲法改正）"
+          className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+        />
+        <button
+          onClick={handleCustomSearch}
+          disabled={!customInput.trim()}
+          className="text-xs px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors shrink-0"
+        >
+          🔍 検索
+        </button>
+      </div>
+
+      {/* 発言一覧 */}
+      {isLoading && (
+        <div className="bg-slate-800/20 rounded-xl border border-slate-700/30 p-8 text-center">
+          <div className="animate-pulse text-slate-500 text-sm">発言を検索中...</div>
+        </div>
+      )}
+
+      {!isLoading && speeches.length > 0 && (
+        <div className="bg-slate-800/20 rounded-xl border border-slate-700/30 overflow-hidden">
+          <div className="max-h-[500px] overflow-y-auto">
+            {speeches.slice(0, showCount).map((sp, i) => {
+              const isExpanded = expandedSpeech === sp.id
+              return (
+                <div key={sp.id} className={`${i > 0 ? 'border-t border-slate-700/20' : ''}`}>
+                  <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700/10">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-slate-400">{sp.date}</span>
+                      <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
+                        {sp.meetings?.house} {sp.meetings?.meeting_name}
+                      </span>
+                      {sp.speaker_position && <span className="text-amber-400/80">{sp.speaker_position}</span>}
+                    </div>
+                    <a href={sp.speech_url || '#'} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-blue-400/60 hover:text-blue-400 transition-colors">原文 ↗</a>
+                  </div>
+                  <div className="px-4 py-3 cursor-pointer hover:bg-slate-700/20 transition-colors"
+                    onClick={() => setExpandedSpeech(isExpanded ? null : sp.id)}>
+                    {sp.ai_summary && (
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3 text-sm text-blue-200">
+                        <span className="text-xs text-blue-400 font-medium">🤖 AI要約：</span>
+                        <span className="ml-2">{sp.ai_summary}</span>
+                      </div>
+                    )}
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      {isExpanded ? sp.content?.replace(/^○.+?　/, '') : truncateSpeech(sp.content)}
+                    </p>
+                    {(sp.content?.length || 0) > 200 && (
+                      <button className="text-xs text-blue-400/60 hover:text-blue-400 mt-2 transition-colors">
+                        {isExpanded ? '▲ 閉じる' : '▼ 全文を表示'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {showCount < speeches.length && (
+            <div className="text-center py-3 border-t border-slate-700/30">
+              <button onClick={() => setShowCount(prev => prev + 20)}
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                もっと読み込む（残り{speeches.length - showCount}件）
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isLoading && speeches.length === 0 && cache[activeTab] !== undefined && (
+        <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-700/30">
+          <div className="text-3xl mb-3">📭</div>
+          <p className="text-slate-400">
+            {activeTab === 'all' ? '発言データがまだありません' : 'この分野の発言が見つかりませんでした'}
+          </p>
+        </div>
+      )}
+
+      {!isLoading && speeches.length === 0 && cache[activeTab] === undefined && (
+        <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-700/30">
+          <div className="text-3xl mb-3">📭</div>
+          <p className="text-slate-400">発言データがまだありません</p>
+        </div>
+      )}
     </div>
   )
 }
