@@ -145,6 +145,44 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================================
+    // update_scandal — 既存の不祥事を編集
+    // ============================================================
+    if (action === 'update_scandal') {
+      const { scandal_id, title, category, severity, start_date, summary, legislator_ids } = body
+
+      // 1. Update scandal record
+      const { data: scandal, error: scandalErr } = await db
+        .from('scandals')
+        .update({
+          title,
+          category,
+          severity,
+          start_date: start_date || null,
+          summary,
+        })
+        .eq('id', scandal_id)
+        .select()
+        .single()
+
+      if (scandalErr) throw scandalErr
+
+      // 2. Re-link legislators (delete existing, insert new)
+      if (legislator_ids !== undefined) {
+        await db.from('scandal_people').delete().eq('scandal_id', scandal_id)
+        if (legislator_ids.length > 0) {
+          const peopleRows = legislator_ids.map((lid: string) => ({
+            scandal_id,
+            legislator_id: lid,
+            role: 'subject',
+          }))
+          await db.from('scandal_people').insert(peopleRows)
+        }
+      }
+
+      return NextResponse.json({ scandal })
+    }
+
+    // ============================================================
     // toggle_publish — 公開/非公開の切り替え
     // ============================================================
     if (action === 'toggle_publish') {

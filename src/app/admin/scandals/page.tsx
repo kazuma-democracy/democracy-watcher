@@ -78,6 +78,9 @@ export default function AdminScandalsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<string | null>(null)
 
+  // Editing
+  const [editingId, setEditingId] = useState<string | null>(null)
+
   // Active tab
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('list')
 
@@ -247,7 +250,7 @@ export default function AdminScandalsPage() {
   }
 
   // ============================================================
-  // 登録
+  // 登録 / 更新
   // ============================================================
   async function handleSubmit() {
     if (!title || !summary) {
@@ -258,47 +261,97 @@ export default function AdminScandalsPage() {
     setSubmitting(true)
     setSubmitResult(null)
 
-    const sources = Array.from(selectedArticles).map(idx => {
-      const a = articles[idx]
-      return {
-        url: a.url,
-        publisher: a.source,
-        published_at: a.date?.replace(/\//g, '-') || null,
-        snippet: a.title,
-      }
-    })
-
     try {
-      const res = await adminFetch({
-        action: 'create_scandal',
-        title,
-        category,
-        severity,
-        start_date: startDate || null,
-        summary,
-        sources,
-        legislator_ids: linkedLegs.map(l => l.id),
-      })
-      const data = await res.json()
-      if (data.error) {
-        setSubmitResult(`❌ ${data.error}`)
+      if (editingId) {
+        // ---- 更新モード ----
+        const res = await adminFetch({
+          action: 'update_scandal',
+          scandal_id: editingId,
+          title,
+          category,
+          severity,
+          start_date: startDate || null,
+          summary,
+          legislator_ids: linkedLegs.map(l => l.id),
+        })
+        const data = await res.json()
+        if (data.error) {
+          setSubmitResult(`❌ ${data.error}`)
+        } else {
+          setSubmitResult(`✅ 更新完了: ${data.scandal.title}`)
+          setEditingId(null)
+          resetForm()
+          loadScandals()
+        }
       } else {
-        setSubmitResult(`✅ 登録完了: ${data.scandal.title}`)
-        // Reset form
-        setTitle('')
-        setSummary('')
-        setStartDate('')
-        setSelectedArticles(new Set())
-        setLinkedLegs([])
-        setArticles([])
-        // Reload list
-        loadScandals()
+        // ---- 新規登録モード ----
+        const sources = Array.from(selectedArticles).map(idx => {
+          const a = articles[idx]
+          return {
+            url: a.url,
+            publisher: a.source,
+            published_at: a.date?.replace(/\//g, '-') || null,
+            snippet: a.title,
+          }
+        })
+
+        const res = await adminFetch({
+          action: 'create_scandal',
+          title,
+          category,
+          severity,
+          start_date: startDate || null,
+          summary,
+          sources,
+          legislator_ids: linkedLegs.map(l => l.id),
+        })
+        const data = await res.json()
+        if (data.error) {
+          setSubmitResult(`❌ ${data.error}`)
+        } else {
+          setSubmitResult(`✅ 登録完了: ${data.scandal.title}`)
+          resetForm()
+          loadScandals()
+        }
       }
     } catch (e: any) {
       setSubmitResult(`❌ エラー: ${e.message}`)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // ============================================================
+  // 編集開始
+  // ============================================================
+  function startEdit(scandal: Scandal) {
+    setEditingId(scandal.id)
+    setTitle(scandal.title)
+    setCategory(scandal.category)
+    setSeverity(scandal.severity)
+    setStartDate(scandal.start_date || '')
+    setSummary(scandal.summary)
+    // 関係議員をセット
+    const legs: LinkedLeg[] = scandal.people
+      .filter((p: any) => p.legislators)
+      .map((p: any) => ({
+        id: p.legislators.id,
+        name: p.legislators.name,
+        party: p.legislators.current_party,
+      }))
+    setLinkedLegs(legs)
+    // タブを切り替え
+    setActiveTab('register')
+    setSubmitResult(null)
+    setArticles([])
+    setSelectedArticles(new Set())
+    // スクロールトップ
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    resetForm()
   }
 
   // ============================================================
@@ -316,6 +369,7 @@ export default function AdminScandalsPage() {
     setSearchName('')
     setSearchKeyword('不祥事')
     setSubmitResult(null)
+    setEditingId(null)
   }
 
   // ============================================================
@@ -408,7 +462,7 @@ export default function AdminScandalsPage() {
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          ➕ 新規登録
+          {editingId ? '✏️ 編集中' : '➕ 新規登録'}
         </button>
       </div>
 
@@ -477,6 +531,12 @@ export default function AdminScandalsPage() {
 
                     {/* 操作ボタン */}
                     <div className="flex gap-1.5 shrink-0">
+                      <button
+                        onClick={() => startEdit(scandal)}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:bg-blue-900/20 hover:text-blue-400 hover:border-blue-600/40 transition-colors"
+                      >
+                        ✏️ 編集
+                      </button>
                       <button
                         onClick={() => togglePublish(scandal.id, scandal.is_published)}
                         className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
@@ -552,6 +612,22 @@ export default function AdminScandalsPage() {
       {/* ============================================================ */}
       {activeTab === 'register' && (
         <div>
+          {/* 編集モードバナー */}
+          {editingId && (
+            <div className="bg-blue-900/30 border border-blue-600/30 rounded-xl p-4 mb-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-blue-300">✏️ 編集モード</p>
+                <p className="text-xs text-blue-400/70 mt-0.5">既存の不祥事レコードを編集中です</p>
+              </div>
+              <button
+                onClick={cancelEdit}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-colors"
+              >
+                編集をキャンセル
+              </button>
+            </div>
+          )}
+
           {/* STEP 1: ニュース検索 */}
           <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
             <h2 className="text-sm font-bold text-slate-300 mb-3">① ニュース検索</h2>
@@ -754,9 +830,9 @@ export default function AdminScandalsPage() {
             )}
           </div>
 
-          {/* STEP 4: 登録 */}
+          {/* STEP 4: 登録/更新 */}
           <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
-            <h2 className="text-sm font-bold text-slate-300 mb-3">④ 登録</h2>
+            <h2 className="text-sm font-bold text-slate-300 mb-3">{editingId ? '④ 更新' : '④ 登録'}</h2>
 
             {/* プレビュー */}
             <div className="bg-slate-900/50 rounded-lg p-4 mb-4">
@@ -785,9 +861,16 @@ export default function AdminScandalsPage() {
             <button
               onClick={handleSubmit}
               disabled={submitting || !title || !summary}
-              className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-bold transition-colors"
+              className={`w-full py-3 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-bold transition-colors ${
+                editingId
+                  ? 'bg-blue-600 hover:bg-blue-500'
+                  : 'bg-red-600 hover:bg-red-500'
+              }`}
             >
-              {submitting ? '登録中...' : '⚠️ 不祥事を登録する'}
+              {submitting
+                ? (editingId ? '更新中...' : '登録中...')
+                : (editingId ? '✏️ この不祥事を更新する' : '⚠️ 不祥事を登録する')
+              }
             </button>
 
             {submitResult && (
