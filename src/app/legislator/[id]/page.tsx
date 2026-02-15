@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
+import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel, getPositionDisplay } from '@/lib/supabase'
 
 type SpeechWithMeeting = {
   id: string
@@ -239,12 +239,15 @@ export default function LegislatorPage() {
               <div className="text-xs text-slate-500 mb-1">会派</div>
               <div className="text-sm text-slate-200">{legislator.current_party || '不明'}</div>
             </div>
-            {legislator.current_position && (
-              <div>
-                <div className="text-xs text-slate-500 mb-1">役職</div>
-                <div className="text-sm text-amber-400">{legislator.current_position}</div>
-              </div>
-            )}
+            {(() => {
+              const pd = getPositionDisplay(legislator)
+              return pd.label ? (
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">役職{!pd.isOverride && ' ※発言時点'}</div>
+                  <div className={`text-sm ${pd.isOverride ? 'text-amber-400' : 'text-amber-400/60 italic'}`}>{pd.label}</div>
+                </div>
+              ) : null
+            })()}
             <div>
               <div className="text-xs text-slate-500 mb-1">発言数</div>
               <div className="text-sm text-emerald-400 font-bold">{speechCount}件</div>

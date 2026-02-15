@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
+import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel, getPositionDisplay } from '@/lib/supabase'
 
 type LegWithStats = Legislator & {
   speech_count: number
@@ -55,7 +55,7 @@ function LegCard({ leg }: { leg: LegWithStats }) {
         <div className="bg-slate-800 p-4 space-y-2 text-sm">
           <div className="flex justify-between"><span className="text-slate-500">政党</span><span className="text-slate-200">{getPartyShortName(leg.current_party)}</span></div>
           <div className="flex justify-between"><span className="text-slate-500">所属院</span><span className="text-slate-200">{getHouseLabel(leg.house)}</span></div>
-          {leg.current_position && <div className="flex justify-between"><span className="text-slate-500">役職</span><span className="text-amber-400 text-xs">{leg.current_position}</span></div>}
+          {(() => { const pd = getPositionDisplay(leg); return pd.label ? <div className="flex justify-between"><span className="text-slate-500">役職{!pd.isOverride ? ' ※' : ''}</span><span className={`text-xs ${pd.isOverride ? 'text-amber-400' : 'text-amber-400/60 italic'}`}>{pd.label}</span></div> : null })()}
           <div className="flex justify-between"><span className="text-slate-500">発言数</span><span className="text-emerald-400 font-bold">{leg.speech_count.toLocaleString()}件</span></div>
         </div>
       </div>

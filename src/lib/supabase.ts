@@ -13,6 +13,9 @@ export type Legislator = {
   name_yomi: string | null
   current_party: string | null
   current_position: string | null
+  current_position_override: string | null
+  current_position_source: string | null
+  current_position_updated_at: string | null
   house: string | null
   district: string | null
   first_seen: string | null
@@ -96,6 +99,20 @@ export function getHouseLabel(house: string | null): string {
   if (house === 'representatives' || house === '衆議院') return '衆議院'
   if (house === 'councillors' || house === '参議院') return '参議院'
   return house
+}
+
+/** 役職の表示: override 優先、なければ発言由来 */
+export function getPositionDisplay(leg: { current_position_override?: string | null, current_position?: string | null }): {
+  label: string | null
+  isOverride: boolean
+} {
+  if (leg.current_position_override) {
+    return { label: leg.current_position_override, isOverride: true }
+  }
+  if (leg.current_position) {
+    return { label: leg.current_position, isOverride: false }
+  }
+  return { label: null, isOverride: false }
 }
 
 // === データ取得関数 ===

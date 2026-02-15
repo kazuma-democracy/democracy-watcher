@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, getPartyClass, getPartyShortName, getHouseLabel } from '@/lib/supabase'
+import { supabase, getPartyClass, getPartyShortName, getHouseLabel, getPositionDisplay } from '@/lib/supabase'
 
 type RankingEntry = {
   legislator_id: string
@@ -10,6 +10,7 @@ type RankingEntry = {
   house: string
   current_party: string | null
   current_position: string | null
+  current_position_override: string | null
   total_speeches: number
   speeches_1y: number
   meetings_attended: number
@@ -228,7 +229,7 @@ export default function RankingsPage() {
                             {partyShort}
                           </span>
                           {getHouseLabel(r.house)}
-                          {r.current_position && <span className="text-amber-400/70 ml-1">{r.current_position}</span>}
+                          {r.current_position && (() => { const pd = getPositionDisplay(r); return pd.label ? <span className={`ml-1 ${pd.isOverride ? 'text-amber-400/70' : 'text-amber-400/40 italic'}`}>{pd.label}</span> : null })()}
                         </div>
                       </a>
                     </td>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel, getLegislatorsWithCounts, getStats, searchSpeeches } from '@/lib/supabase'
+import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel, getPositionDisplay, getLegislatorsWithCounts, getStats, searchSpeeches } from '@/lib/supabase'
 
 const PARTY_FILTERS = [
   { key: 'all', label: '全政党', color: 'text-slate-300 border-slate-500' },
@@ -346,7 +346,10 @@ export default function Home() {
         {filtered.map((leg) => {
           const partyClass = getPartyClass(leg.current_party)
           const partyShort = getPartyShortName(leg.current_party)
-          const position = truncatePosition(leg.current_position)
+          const position = (() => {
+            const pd = getPositionDisplay(leg)
+            return pd.label ? { text: truncatePosition(pd.label), isOverride: pd.isOverride, full: pd.label } : null
+          })()
           const isInactive = (leg.speech_count || 0) === 0
           return (
             <a
@@ -374,8 +377,8 @@ export default function Home() {
                   {getHouseLabel(leg.house)}
                 </span>
                 {position && (
-                  <span className="text-amber-400/80 truncate max-w-[200px]" title={leg.current_position || ''}>
-                    {position}
+                  <span className={`truncate max-w-[200px] ${position.isOverride ? 'text-amber-400' : 'text-amber-400/50 italic'}`} title={position.full}>
+                    {position.text}{!position.isOverride && ' ※'}
                   </span>
                 )}
               </div>
