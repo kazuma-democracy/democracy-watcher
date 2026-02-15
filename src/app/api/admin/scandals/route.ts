@@ -214,16 +214,99 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================================
-    // search_legislators — 議員検索
+    // search_legislators — 議員検索（改善版）
     // ============================================================
     if (action === 'search_legislators') {
       const { query } = body
-      const { data } = await db
+      if (!query?.trim()) {
+        return NextResponse.json({ legislators: [] })
+      }
+
+      const q = query.trim()
+
+      // 1st: exact partial match (current behavior)
+      const { data: exact } = await db
         .from('legislators')
         .select('id, name, current_party, house')
-        .or(`name.ilike.%${query}%,name_yomi.ilike.%${query}%`)
+        .or(`name.ilike.%${q}%,name_yomi.ilike.%${q}%`)
         .limit(10)
-      return NextResponse.json({ legislators: data || [] })
+
+      if (exact && exact.length > 0) {
+        return NextResponse.json({ legislators: exact })
+      }
+
+      // 2nd: strip spaces & try again (handles full-width space in DB names)
+      const noSpace = q.replace(/[\s　]/g, '')
+      const { data: noSpaceResult } = await db
+        .from('legislators')
+        .select('id, name, current_party, house')
+        .or(`name.ilike.%${noSpace}%,name_yomi.ilike.%${noSpace}%`)
+        .limit(10)
+
+      if (noSpaceResult && noSpaceResult.length > 0) {
+        return NextResponse.json({ legislators: noSpaceResult })
+      }
+
+      // 3rd: split into parts and search each (e.g. "岸田" + "文雄" separately)
+      const parts = noSpace.length >= 2
+        ? [noSpace.substring(0, 2), noSpace.substring(2)].filter(p => p.length > 0)
+        : [noSpace]
+
+      // Search for surname (first 2 chars) which is most discriminating
+      const { data: partialResult } = await db
+        .from('legislators')
+        .select('id, name, current_party, house')
+        .or(parts.map(p => `name.ilike.%${p}%`).join(','))
+        .limit(20)
+
+      // If searching by parts, prioritize matches that match all parts
+      if (partialResult && partialResult.length > 0) {
+        const scored = partialResult.map(leg => {
+          const matchCount = parts.filter(p =>
+            leg.name.includes(p) || (leg as any).name_yomi?.includes(p)
+          ).length
+          return { ...leg, matchCount }
+        })
+        scored.sort((a, b) => b.matchCount - a.matchCount)
+        return NextResponse.json({ legislators: scored.slice(0, 10) })
+      }
+
+      // 4th: nothing found — return debug info
+      console.log(`[search_legislators] No results for: "${q}"`)
+      return NextResponse.json({ legislators: [], debug: `"${q}" に一致する議員が見つかりません` })
+    }
+
+    // ============================================================
+    // debug_legislators — DB内の議員を診断
+    // ============================================================
+    if (action === 'debug_legislators') {
+      const { count } = await db
+        .from('legislators')
+        .select('*', { count: 'exact', head: true })
+
+      const { data: sample } = await db
+        .from('legislators')
+        .select('id, name, name_yomi, house, current_party')
+        .order('name')
+        .limit(30)
+
+      // 特定の名前をチェック
+      const testNames = ['岸田文雄', '岸田', '松野博一', '萩生田光一', '安倍晋三']
+      const checks: Record<string, any> = {}
+      for (const name of testNames) {
+        const { data } = await db
+          .from('legislators')
+          .select('id, name')
+          .ilike('name', `%${name}%`)
+          .limit(3)
+        checks[name] = data || []
+      }
+
+      return NextResponse.json({
+        total: count,
+        sample,
+        name_checks: checks,
+      })
     }
 
     return NextResponse.json({ error: '不明なアクション: ' + action }, { status: 400 })

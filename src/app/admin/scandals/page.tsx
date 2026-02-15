@@ -231,17 +231,35 @@ export default function AdminScandalsPage() {
   // ============================================================
   // 議員検索
   // ============================================================
+  const [legDebug, setLegDebug] = useState<string | null>(null)
+  const [dbDiag, setDbDiag] = useState<any>(null)
+
   async function searchLegislator() {
     if (!legQuery.trim()) return
     setLegSearching(true)
+    setLegDebug(null)
     try {
       const res = await adminFetch({ action: 'search_legislators', query: legQuery })
       const data = await res.json()
       setLegResults(data.legislators || [])
+      if (data.debug) setLegDebug(data.debug)
+      if (data.legislators?.length === 0 && !data.debug) {
+        setLegDebug(`「${legQuery}」に一致する議員が見つかりません`)
+      }
     } catch (e) {
       console.error(e)
     } finally {
       setLegSearching(false)
+    }
+  }
+
+  async function debugLegislators() {
+    try {
+      const res = await adminFetch({ action: 'debug_legislators' })
+      const data = await res.json()
+      setDbDiag(data)
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -848,7 +866,15 @@ export default function AdminScandalsPage() {
 
           {/* STEP 3: 議員紐付け */}
           <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
-            <h2 className="text-sm font-bold text-slate-300 mb-3">③ 関係議員を紐付け</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-slate-300">③ 関係議員を紐付け</h2>
+              <button
+                onClick={debugLegislators}
+                className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+              >
+                🔧 DB確認
+              </button>
+            </div>
 
             <div className="flex gap-2 mb-3">
               <input
@@ -867,6 +893,44 @@ export default function AdminScandalsPage() {
                 {legSearching ? '...' : '検索'}
               </button>
             </div>
+
+            {/* デバッグメッセージ */}
+            {legDebug && (
+              <p className="text-xs text-yellow-400/80 mb-2">⚠️ {legDebug}</p>
+            )}
+
+            {/* DB診断結果 */}
+            {dbDiag && (
+              <div className="bg-slate-900/60 rounded-lg p-3 mb-3 border border-slate-700/30">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-slate-400">🔧 DB診断結果</p>
+                  <button onClick={() => setDbDiag(null)} className="text-xs text-slate-600 hover:text-slate-400">✕</button>
+                </div>
+                <p className="text-xs text-slate-400 mb-2">登録議員数: <span className="text-emerald-400 font-bold">{dbDiag.total ?? '不明'}</span></p>
+                <p className="text-xs text-slate-500 mb-1">名前検索テスト:</p>
+                {dbDiag.name_checks && Object.entries(dbDiag.name_checks).map(([name, results]: [string, any]) => (
+                  <div key={name} className="text-xs mb-0.5">
+                    <span className="text-slate-500">{name}:</span>{' '}
+                    {results.length > 0
+                      ? <span className="text-emerald-400">{results.map((r: any) => r.name).join(', ')}</span>
+                      : <span className="text-red-400">❌ 見つからない</span>
+                    }
+                  </div>
+                ))}
+                {dbDiag.sample && (
+                  <details className="mt-2">
+                    <summary className="text-xs text-slate-600 cursor-pointer hover:text-slate-400">先頭30件を表示</summary>
+                    <div className="mt-1 max-h-[200px] overflow-y-auto">
+                      {dbDiag.sample.map((leg: any) => (
+                        <p key={leg.id} className="text-xs text-slate-500">
+                          {leg.name} ({leg.house}) {leg.current_party}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
 
             {/* 検索結果 */}
             {legResults.length > 0 && (
