@@ -191,7 +191,7 @@ export default function LegislatorPage() {
         </a>
       </div>
 
-      {/* プロフィールカード */}
+      {/* ① プロフィールカード */}
       <div className={`rounded-2xl overflow-hidden mb-8 border border-slate-700/50`}>
         <div className={`party-${partyClass} px-6 py-4`}>
           <div className="flex items-center justify-between">
@@ -230,15 +230,98 @@ export default function LegislatorPage() {
         </div>
       </div>
 
-      {/* グラフセクション */}
+      {/* ② 関連ニュース */}
+      <LegislatorNewsSection name={legislator.name} party={legislator.current_party} />
+
+      {/* ③ 国会発言（スクロール式） */}
+      <div className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-100">
+            💬 国会発言
+          </h2>
+          <span className="text-sm text-slate-500">{speechCount}件（新しい順）</span>
+        </div>
+
+        {speeches.length > 0 ? (
+          <div className="bg-slate-800/20 rounded-xl border border-slate-700/30 overflow-hidden">
+            <div className="max-h-[500px] overflow-y-auto">
+              {speeches.slice(0, showCount).map((sp, i) => {
+                const isExpanded = expandedSpeech === sp.id
+                return (
+                  <div
+                    key={sp.id}
+                    className={`${i > 0 ? 'border-t border-slate-700/20' : ''}`}
+                  >
+                    <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700/10">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-slate-400">{sp.date}</span>
+                        <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
+                          {sp.meetings?.house} {sp.meetings?.meeting_name}
+                        </span>
+                        {sp.speaker_position && (
+                          <span className="text-amber-400/80">{sp.speaker_position}</span>
+                        )}
+                      </div>
+                      <a
+                        href={sp.speech_url || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-400/60 hover:text-blue-400 transition-colors"
+                      >
+                        原文 ↗
+                      </a>
+                    </div>
+                    <div
+                      className="px-4 py-3 cursor-pointer hover:bg-slate-700/20 transition-colors"
+                      onClick={() => setExpandedSpeech(isExpanded ? null : sp.id)}
+                    >
+                      {sp.ai_summary && (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3 text-sm text-blue-200">
+                          <span className="text-xs text-blue-400 font-medium">🤖 AI要約：</span>
+                          <span className="ml-2">{sp.ai_summary}</span>
+                        </div>
+                      )}
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        {isExpanded ? sp.content?.replace(/^○.+?　/, '') : truncate(sp.content)}
+                      </p>
+                      {(sp.content?.length || 0) > 200 && (
+                        <button className="text-xs text-blue-400/60 hover:text-blue-400 mt-2 transition-colors">
+                          {isExpanded ? '▲ 閉じる' : '▼ 全文を表示'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {showCount < speeches.length && (
+              <div className="text-center py-3 border-t border-slate-700/30">
+                <button
+                  onClick={() => setShowCount((prev) => prev + 20)}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  もっと読み込む
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-700/30">
+            <div className="text-3xl mb-3">📭</div>
+            <p className="text-slate-400">発言データがまだありません</p>
+            <p className="text-slate-500 text-sm mt-1">データ収集中です。しばらくお待ちください。</p>
+          </div>
+        )}
+      </div>
+
+      {/* ④ グラフセクション（月別発言数・委員会別） */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {/* 月別発言数チャート */}
         {monthly.length > 0 && (
           <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
             <h3 className="text-sm font-bold text-slate-300 mb-4">📈 月別発言数</h3>
             {(() => {
               const maxM = Math.max(...monthly.map(x => x.count))
-              const barMaxHeight = 120 // px
+              const barMaxHeight = 120
               return (
                 <>
                   <div className="flex items-end gap-1.5" style={{ height: `${barMaxHeight + 20}px` }}>
@@ -271,7 +354,6 @@ export default function LegislatorPage() {
           </div>
         )}
 
-        {/* 委員会別発言数 */}
         {committees.length > 0 && (
           <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
             <h3 className="text-sm font-bold text-slate-300 mb-4">📋 委員会別発言数</h3>
@@ -293,17 +375,7 @@ export default function LegislatorPage() {
         )}
       </div>
 
-      {/* 議員比較リンク */}
-      <div className="mb-8">
-        <a
-          href={`/compare?leg1=${id}`}
-          className="text-sm text-blue-400/70 hover:text-blue-400 transition-colors"
-        >
-          ⚖️ この議員を他の議員と比較する →
-        </a>
-      </div>
-
-      {/* 所属会派の賛否履歴 */}
+      {/* ⑤ 所属会派の賛否履歴 */}
       {legislator.current_party && (
         <div className="mb-8">
           <h2 className="text-xl font-bold text-slate-100 mb-1">
@@ -323,7 +395,6 @@ export default function LegislatorPage() {
             </div>
           ) : (
             <>
-              {/* 賛成/反対サマリーバー */}
               {(() => {
                 const yeaCount = partyBills.filter(pb => pb.vote === '賛成').length
                 const nayCount = partyBills.filter(pb => pb.vote === '反対').length
@@ -339,14 +410,10 @@ export default function LegislatorPage() {
                       <div className="h-full bg-emerald-500/70 rounded-l-full" style={{ width: `${yeaPct}%` }} />
                       <div className="h-full bg-red-500/70 rounded-r-full" style={{ width: `${100 - yeaPct}%` }} />
                     </div>
-                    <p className="text-xs text-slate-500 mt-2 text-center">
-                      直近{total}件の採決
-                    </p>
+                    <p className="text-xs text-slate-500 mt-2 text-center">直近{total}件の採決</p>
                   </div>
                 )
               })()}
-
-              {/* スクロール可能な賛否リスト */}
               <div className="bg-slate-800/20 rounded-xl border border-slate-700/30 overflow-hidden">
                 <div className="max-h-96 overflow-y-auto">
                   {partyBills.map((pb, i) => (
@@ -391,88 +458,104 @@ export default function LegislatorPage() {
         </div>
       )}
 
-      {/* 発言一覧 */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-100">
-          💬 国会発言
-        </h2>
-        <span className="text-sm text-slate-500">{speechCount}件（新しい順）</span>
+      {/* 議員比較リンク */}
+      <div className="mb-8 text-center">
+        <a
+          href={`/compare?leg1=${id}`}
+          className="text-sm text-blue-400/70 hover:text-blue-400 transition-colors"
+        >
+          ⚖️ この議員を他の議員と比較する →
+        </a>
       </div>
+    </div>
+  )
+}
 
-      <div className="space-y-3">
-        {speeches.slice(0, showCount).map((sp) => {
-          const isExpanded = expandedSpeech === sp.id
-          return (
-            <div
-              key={sp.id}
-              className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden"
+// ===== 議員関連ニュースコンポーネント =====
+function LegislatorNewsSection({ name, party }: { name: string; party: string | null }) {
+  const [articles, setArticles] = useState<{ title: string; url: string; source: string; date: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    async function fetchNews() {
+      try {
+        const query = party ? `${name} ${getPartyShortName(party)}` : name
+        const res = await fetch(`/api/news?q=${encodeURIComponent(query)}`)
+        const data = await res.json()
+        setArticles(data.articles || [])
+      } catch {
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchNews()
+  }, [name, party])
+
+  return (
+    <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-8">
+      <h2 className="text-sm font-bold text-slate-300 mb-3">📰 関連ニュース</h2>
+
+      {loading && (
+        <div className="animate-pulse space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-10 bg-slate-700/30 rounded-lg" />
+          ))}
+        </div>
+      )}
+
+      {!loading && articles.length > 0 && (
+        <div className="space-y-1.5 mb-3">
+          {articles.map((a, i) => (
+            <a
+              key={i}
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700/30 transition-colors group"
             >
-              {/* ヘッダー */}
-              <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700/30">
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-slate-400">{sp.date}</span>
-                  <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">
-                    {sp.meetings?.house} {sp.meetings?.meeting_name}
-                  </span>
-                  {sp.speaker_position && (
-                    <span className="text-amber-400/80">{sp.speaker_position}</span>
-                  )}
-                </div>
-                <a
-                  href={sp.speech_url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-400/60 hover:text-blue-400 transition-colors"
-                  title="国会会議録で見る"
-                >
-                  原文 ↗
-                </a>
-              </div>
-
-              {/* 発言内容 */}
-              <div
-                className="px-4 py-3 cursor-pointer"
-                onClick={() => setExpandedSpeech(isExpanded ? null : sp.id)}
-              >
-                {sp.ai_summary && (
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3 text-sm text-blue-200">
-                    <span className="text-xs text-blue-400 font-medium">🤖 AI要約：</span>
-                    <span className="ml-2">{sp.ai_summary}</span>
-                  </div>
-                )}
-                <p className="text-sm text-slate-300 leading-relaxed">
-                  {isExpanded ? sp.content?.replace(/^○.+?　/, '') : truncate(sp.content)}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-200 leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">
+                  {a.title}
                 </p>
-                {(sp.content?.length || 0) > 200 && (
-                  <button className="text-xs text-blue-400/60 hover:text-blue-400 mt-2 transition-colors">
-                    {isExpanded ? '▲ 閉じる' : '▼ 全文を表示'}
-                  </button>
-                )}
+                <div className="flex items-center gap-2 mt-1">
+                  {a.source && <span className="text-xs text-slate-500">{a.source}</span>}
+                  {a.date && <span className="text-xs text-slate-600">{a.date}</span>}
+                </div>
               </div>
-            </div>
-          )
-        })}
+              <span className="text-xs text-slate-600 shrink-0 mt-1">↗</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {!loading && articles.length === 0 && !error && (
+        <p className="text-xs text-slate-500 mb-3">関連するニュースが見つかりませんでした</p>
+      )}
+
+      {error && (
+        <p className="text-xs text-slate-500 mb-3">ニュースの取得に失敗しました</p>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700/30">
+        <a
+          href={`https://news.google.com/search?q=${encodeURIComponent(name)}&hl=ja&gl=JP&ceid=JP:ja`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-2.5 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
+        >
+          📰 Google Newsで詳しく ↗
+        </a>
+        <a
+          href={`https://x.com/search?q=${encodeURIComponent(name)}&f=live`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-2.5 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
+        >
+          𝕏 ポストを検索 ↗
+        </a>
       </div>
-
-      {/* もっと見る */}
-      {showCount < speeches.length && (
-        <div className="text-center mt-6">
-          <button
-            onClick={() => setShowCount((prev) => prev + 20)}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-2 rounded-xl text-sm border border-slate-600 transition-colors"
-          >
-            もっと見る
-          </button>
-        </div>
-      )}
-
-      {speeches.length === 0 && (
-        <div className="text-center py-12">
-          <div className="text-3xl mb-3">📭</div>
-          <p className="text-slate-400">発言データがまだありません</p>
-          <p className="text-slate-500 text-sm mt-1">データ収集中です。しばらくお待ちください。</p>
-        </div>
-      )}
     </div>
   )
 }
