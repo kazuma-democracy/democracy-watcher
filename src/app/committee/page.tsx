@@ -13,24 +13,27 @@ const FEATURED_COMMITTEES = [
   { key: '安全保障委員会', label: '安全保障委員会', icon: '🛡️', description: '防衛・安全保障政策の審議' },
 ]
 
+// 護憲派政党
+const GOKEN_PARTIES = ['立憲民主', 'れいわ', '共産']
+
 // 憲法審査会用の発言分類タブ
 const KENPOU_SPEECH_TABS = [
-  { key: 'all', label: '全件', icon: '📋', keywords: [] as string[] },
-  { key: 'pro_amendment', label: '改憲派', icon: '🔴', keywords: ['改正すべき', '改正が必要', '改憲', '発議', '改める必要', '国民投票にかける', '加憲', '新しい時代にふさわしい', '時代に合った'] },
-  { key: 'pro_protect', label: '護憲派', icon: '🔵', keywords: ['守るべき', '改正の必要はない', '護憲', '変えてはならない', '改悪', '立憲主義に反する', '憲法を生かす', '改正ありきではなく'] },
-  { key: 'article9', label: '9条・自衛隊', icon: '🛡️', keywords: ['九条', '9条', '自衛隊', '戦力', '交戦権', '専守防衛', '戦争放棄'] },
-  { key: 'emergency', label: '緊急事態', icon: '🚨', keywords: ['緊急事態', '緊急政令', '非常事態', '有事', '緊急事態条項', '国会の機能維持'] },
-  { key: 'rights', label: '人権・権利', icon: '⚖️', keywords: ['人権', '基本的人権', '表現の自由', 'プライバシー', '知る権利', '環境権', '新しい人権'] },
-  { key: 'referendum', label: '国民投票', icon: '🗳️', keywords: ['国民投票', '投票法', 'CM規制', '広告規制', '最低投票率'] },
-  { key: 'procedure', label: '審査手続', icon: '📝', keywords: ['請願', '審査会の運営', '公聴会', '参考人', '自由討議', '定足数'] },
+  { key: 'all', label: '全件', icon: '📋', keywords: [] as string[], partyGroup: '' },
+  { key: 'pro_amendment', label: '改憲派', icon: '🔴', keywords: [], partyGroup: 'kaiken' },
+  { key: 'pro_protect', label: '護憲派', icon: '🔵', keywords: [], partyGroup: 'goken' },
+  { key: 'article9', label: '9条・自衛隊', icon: '🛡️', keywords: ['九条', '9条', '自衛隊', '戦力', '交戦権', '専守防衛', '戦争放棄'], partyGroup: '' },
+  { key: 'emergency', label: '緊急事態', icon: '🚨', keywords: ['緊急事態', '緊急政令', '非常事態', '有事', '緊急事態条項', '国会の機能維持'], partyGroup: '' },
+  { key: 'rights', label: '人権・権利', icon: '⚖️', keywords: ['人権', '基本的人権', '表現の自由', 'プライバシー', '知る権利', '環境権', '新しい人権'], partyGroup: '' },
+  { key: 'referendum', label: '国民投票', icon: '🗳️', keywords: ['国民投票', '投票法', 'CM規制', '広告規制', '最低投票率'], partyGroup: '' },
+  { key: 'procedure', label: '審査手続', icon: '📝', keywords: ['請願', '審査会の運営', '公聴会', '参考人', '自由討議', '定足数'], partyGroup: '' },
 ]
 
 // 汎用委員会用の発言分類タブ
 const GENERIC_SPEECH_TABS = [
-  { key: 'all', label: '全件', icon: '📋', keywords: [] as string[] },
-  { key: 'question', label: '質疑', icon: '❓', keywords: ['お伺い', '質問', '伺いたい', '御見解', 'いかがでしょうか', '認識を伺'] },
-  { key: 'answer', label: '答弁', icon: '💬', keywords: ['お答え', '答弁', '御指摘', '御質問に', '政府として'] },
-  { key: 'criticism', label: '追及・批判', icon: '⚠️', keywords: ['問題', '責任', '説明責任', '不十分', '疑惑', '納得できない', '許されない'] },
+  { key: 'all', label: '全件', icon: '📋', keywords: [] as string[], partyGroup: '' },
+  { key: 'question', label: '質疑', icon: '❓', keywords: ['お伺い', '質問', '伺いたい', '御見解', 'いかがでしょうか', '認識を伺'], partyGroup: '' },
+  { key: 'answer', label: '答弁', icon: '💬', keywords: ['お答え', '答弁', '御指摘', '御質問に', '政府として'], partyGroup: '' },
+  { key: 'criticism', label: '追及・批判', icon: '⚠️', keywords: ['問題', '責任', '説明責任', '不十分', '疑惑', '納得できない', '許されない'], partyGroup: '' },
 ]
 
 // 論点分析カード用（既存のキーワード分析を維持）
@@ -176,10 +179,27 @@ function CommitteeWatchPage() {
 
   // 発言フィルター
   const speechTabs = isKenpou ? KENPOU_SPEECH_TABS : GENERIC_SPEECH_TABS
+
+  function isGokenParty(sp: any): boolean {
+    const group = sp.speaker_group || sp.legislators?.current_party || ''
+    return GOKEN_PARTIES.some(p => group.includes(p))
+  }
+
   const filteredSpeeches = useMemo(() => {
     if (speechFilter === 'all') return speeches
     const tab = speechTabs.find(k => k.key === speechFilter)
-    if (!tab || tab.keywords.length === 0) return speeches
+    if (!tab) return speeches
+
+    // 政党グループフィルター
+    if (tab.partyGroup === 'goken') {
+      return speeches.filter((sp: any) => isGokenParty(sp))
+    }
+    if (tab.partyGroup === 'kaiken') {
+      return speeches.filter((sp: any) => !isGokenParty(sp))
+    }
+
+    // キーワードフィルター
+    if (tab.keywords.length === 0) return speeches
     return speeches.filter((sp: any) =>
       tab.keywords.some(k => sp.content?.includes(k))
     )
@@ -488,7 +508,11 @@ function CommitteeWatchPage() {
               {tab.icon} {tab.label}
               {tab.key !== 'all' && (
                 <span className="ml-1 opacity-60">
-                  ({speeches.filter((sp: any) => tab.keywords.some((k: string) => sp.content?.includes(k))).length})
+                  ({tab.partyGroup === 'goken'
+                    ? speeches.filter((sp: any) => isGokenParty(sp)).length
+                    : tab.partyGroup === 'kaiken'
+                    ? speeches.filter((sp: any) => !isGokenParty(sp)).length
+                    : speeches.filter((sp: any) => tab.keywords.some((k: string) => sp.content?.includes(k))).length})
                 </span>
               )}
             </button>
