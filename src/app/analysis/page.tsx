@@ -60,6 +60,7 @@ export default function AnalysisPage() {
   const [contested, setContested] = useState<ContestedBill[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'heatmap' | 'agreement' | 'controversial'>('heatmap')
+  const [contestedCatFilter, setContestedCatFilter] = useState<string>('all')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -346,13 +347,57 @@ export default function AnalysisPage() {
       )}
 
       {/* ===== TAB 3: 賛否が割れた法案 ===== */}
-      {tab === 'controversial' && (
+      {tab === 'controversial' && (() => {
+        // カテゴリ一覧を抽出（件数順）
+        const contestedCats: Record<string, number> = {}
+        for (const b of contested) {
+          const cat = b.category || '未分類'
+          contestedCats[cat] = (contestedCats[cat] || 0) + 1
+        }
+        const catList = Object.entries(contestedCats).sort((a, b) => b[1] - a[1])
+
+        // フィルタ適用
+        const filtered = contestedCatFilter === 'all'
+          ? contested
+          : contested.filter(b => (b.category || '未分類') === contestedCatFilter)
+
+        return (
         <div>
-          <p className="text-xs text-slate-500 mb-4">
-            賛成・反対の両方が存在する法案（{contested.length}件）。反対会派が多い順。
+          <p className="text-xs text-slate-500 mb-3">
+            賛成・反対の両方が存在する法案。反対会派が多い順。
           </p>
-          <div className="space-y-2 max-h-[650px] overflow-y-auto pr-1">
-            {contested.map((bill) => (
+
+          {/* カテゴリフィルター */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            <button
+              onClick={() => setContestedCatFilter('all')}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                contestedCatFilter === 'all'
+                  ? 'bg-blue-600 border-blue-500 text-white'
+                  : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              すべて ({contested.length})
+            </button>
+            {catList.map(([cat, count]) => (
+              <button
+                key={cat}
+                onClick={() => setContestedCatFilter(cat)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  contestedCatFilter === cat
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {cat} ({count})
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs text-slate-600 mb-2">{filtered.length}件表示</p>
+
+          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+            {filtered.map((bill) => (
               <a
                 key={bill.bill_id}
                 href={`/bills/${bill.bill_id}`}
@@ -390,7 +435,8 @@ export default function AnalysisPage() {
             ))}
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
