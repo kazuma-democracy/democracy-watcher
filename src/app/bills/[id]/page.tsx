@@ -402,7 +402,7 @@ function NewsSection({ billName }: { billName: string }) {
       )}
 
       {!loading && articles.length > 0 && (
-        <div className="space-y-1.5 mb-3">
+        <div className="space-y-1.5 mb-3 max-h-[320px] overflow-y-auto pr-1 scroll-slim">
           {articles.map((a, i) => (
             <a
               key={i}
