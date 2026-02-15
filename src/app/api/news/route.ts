@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const items: { title: string; url: string; source: string; date: string }[] = []
     const itemRegex = /<item>([\s\S]*?)<\/item>/g
     let match
-    while ((match = itemRegex.exec(xml)) !== null && items.length < 5) {
+    while ((match = itemRegex.exec(xml)) !== null && items.length < 20) {
       const block = match[1]
       const title = block.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')?.trim() || ''
       const link = block.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim()
