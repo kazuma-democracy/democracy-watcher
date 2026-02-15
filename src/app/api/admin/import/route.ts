@@ -141,7 +141,9 @@ export async function POST(req: NextRequest) {
       let updated = 0
       const nonLegRoles = ['証人', '参考人', '公述人']
 
-      for (const [, info] of speakerMap) {
+      const speakers = Array.from(speakerMap.values())
+      for (let i = 0; i < speakers.length; i++) {
+        const info = speakers[i]
         // 参考人等はスキップ
         if (info.role && nonLegRoles.includes(info.role)) continue
         // 会派もポジションもない1回だけの発言者はスキップ
