@@ -39,6 +39,9 @@ export default function RootLayout({
               <a href="/compare" className="text-slate-300 hover:text-white transition-colors">
                 議員比較
               </a>
+              <a href="/rankings" className="text-slate-300 hover:text-white transition-colors">
+                ランキング
+              </a>
               <a href="/stats" className="text-slate-300 hover:text-white transition-colors">
                 統計
               </a>

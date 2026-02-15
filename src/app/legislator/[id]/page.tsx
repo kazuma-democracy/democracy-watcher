@@ -36,6 +36,7 @@ export default function LegislatorPage() {
   const [monthly, setMonthly] = useState<{month: string; count: number}[]>([])
   const [partyBills, setPartyBills] = useState<{bill: any; vote: string}[]>([])
   const [partyBillsLoading, setPartyBillsLoading] = useState(true)
+  const [reportCard, setReportCard] = useState<any>(null)
   useEffect(() => {
     async function load() {
       // 議員情報
@@ -91,6 +92,14 @@ export default function LegislatorPage() {
         if (m) mMap[m] = (mMap[m] || 0) + 1
       }
       setMonthly(Object.entries(mMap).map(([month, cnt]) => ({month, count: cnt})).sort((a,b) => a.month.localeCompare(b.month)))
+
+      // レポートカード
+      const { data: rc } = await supabase
+        .from('v_legislator_report_card')
+        .select('*')
+        .eq('legislator_id', id)
+        .single()
+      if (rc) setReportCard(rc)
 
       setLoading(false)
     }
@@ -230,7 +239,84 @@ export default function LegislatorPage() {
         </div>
       </div>
 
-      {/* ② 関連ニュース */}
+      {/* ② 📊 レポートカード */}
+      {reportCard && (
+        <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-slate-300">📊 活動レポートカード</h2>
+            <a href="/rankings" className="text-xs text-blue-400/70 hover:text-blue-400 transition-colors">
+              全議員ランキング →
+            </a>
+          </div>
+
+          {/* 活動スコア（5段階） */}
+          <div className="flex items-center gap-4 mb-4 bg-slate-800/50 rounded-lg p-4 border border-slate-700/30">
+            <div className="text-center">
+              <div className="text-2xl tracking-wider">
+                {Array.from({length: 5}).map((_, i) => (
+                  <span key={i} className={i < reportCard.activity_score ? 'text-amber-400' : 'text-slate-700'}>★</span>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">活動スコア</p>
+            </div>
+            <div className="flex-1 text-right">
+              <span className={`text-lg font-bold ${
+                reportCard.speech_rank_pct >= 80 ? 'text-emerald-400' :
+                reportCard.speech_rank_pct >= 60 ? 'text-blue-400' :
+                reportCard.speech_rank_pct >= 40 ? 'text-slate-300' :
+                'text-slate-500'
+              }`}>
+                上位{100 - reportCard.speech_rank_pct}%
+              </span>
+              <p className="text-xs text-slate-500">{reportCard.house}内 発言ランキング</p>
+            </div>
+          </div>
+
+          {/* 指標グリッド */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* 発言回数 */}
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/20">
+              <div className="text-lg font-bold text-emerald-400">{reportCard.speeches_1y}</div>
+              <div className="text-xs text-slate-500">直近1年の発言</div>
+              <div className="text-xs text-slate-600 mt-1">通算 {reportCard.total_speeches}回</div>
+            </div>
+
+            {/* 会議参加 */}
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/20">
+              <div className="text-lg font-bold text-blue-400">{reportCard.meetings_1y}</div>
+              <div className="text-xs text-slate-500">直近1年の会議</div>
+              <div className="text-xs text-slate-600 mt-1">通算 {reportCard.meetings_attended}回</div>
+            </div>
+
+            {/* 委員会数 */}
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/20">
+              <div className="text-lg font-bold text-purple-400">{reportCard.committees_count}</div>
+              <div className="text-xs text-slate-500">活動委員会数</div>
+              <div className="text-xs text-slate-600 mt-1 truncate" title={reportCard.top_committee_name}>
+                最多: {reportCard.top_committee_name?.replace(/第.*?委員会/, (m: string) => m.length > 10 ? m.slice(0, 10) + '…' : m) || '-'}
+              </div>
+            </div>
+
+            {/* 専門集中度 */}
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/20">
+              <div className="text-lg font-bold text-amber-400">{reportCard.specialization_pct}%</div>
+              <div className="text-xs text-slate-500">専門集中度</div>
+              <div className="text-xs text-slate-600 mt-1">
+                {reportCard.specialization_pct >= 70 ? '特化型' :
+                 reportCard.specialization_pct >= 40 ? 'バランス型' : '幅広型'}
+              </div>
+            </div>
+          </div>
+
+          {/* 注釈 */}
+          <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+            ⚠️ 発言回数は活動の一側面です。質問主意書の提出や委員会での質疑の質は含まれません。
+            発言がない＝欠席とは限りません（出席して発言しない場合もあります）。
+          </p>
+        </div>
+      )}
+
+      {/* ③ 関連ニュース */}
       <LegislatorNewsSection name={legislator.name} party={legislator.current_party} />
 
       {/* ③ 国会発言（スクロール式） */}
