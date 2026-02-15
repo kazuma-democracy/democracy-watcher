@@ -27,7 +27,7 @@ export default function RootLayout({
               </div>
             </a>
             <nav className="flex items-center gap-4 text-sm">
-              <a href="/" className="text-slate-300 hover:text-white transition-colors">
+              <a href="/legislators" className="text-slate-300 hover:text-white transition-colors">
                 議員一覧
               </a>
               <a href="/meetings" className="text-slate-300 hover:text-white transition-colors">

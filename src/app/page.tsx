@@ -1,407 +1,383 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, Legislator, getPartyClass, getPartyShortName, getHouseLabel, getPositionDisplay, getLegislatorsWithCounts, getStats, searchSpeeches } from '@/lib/supabase'
+import { supabase, getPartyClass, getPartyShortName, getHouseLabel, getPositionDisplay } from '@/lib/supabase'
 
-const PARTY_FILTERS = [
-  { key: 'all', label: '全政党', color: 'text-slate-300 border-slate-500' },
-  { key: '自由民主党', label: '自民', color: 'party-tag-ldp' },
-  { key: '立憲民主', label: '立憲', color: 'party-tag-cdp' },
-  { key: '公明', label: '公明', color: 'party-tag-komeito' },
-  { key: '維新', label: '維新', color: 'party-tag-ishin' },
-  { key: '国民民主', label: '国民', color: 'party-tag-dpfp' },
-  { key: '共産', label: '共産', color: 'party-tag-jcp' },
-  { key: 'れいわ', label: 'れいわ', color: 'party-tag-reiwa' },
-  { key: '参政', label: '参政', color: 'party-tag-sansei' },
-  { key: '社会民主党', label: '社民', color: 'party-tag-sdp' },
-  { key: '保守', label: '保守党', color: 'party-tag-other' },
-  { key: '有志の会', label: '有志', color: 'party-tag-other' },
-  { key: '沖縄の風', label: '沖縄', color: 'party-tag-other' },
-  { key: 'NHK', label: 'NHK', color: 'party-tag-other' },
-  { key: 'みらい', label: 'みらい', color: 'party-tag-mirai' },
-  { key: '無所属', label: '無所属', color: 'party-tag-other' },
-]
+// === 不祥事ステータス ===
+const SEVERITY_MAP: Record<string, { label: string; color: string; bg: string }> = {
+  allegation:    { label: '疑惑',     color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  investigation: { label: '調査中',   color: 'text-orange-400', bg: 'bg-orange-500/20' },
+  confirmed:     { label: '事実確認', color: 'text-red-400',    bg: 'bg-red-500/20' },
+  convicted:     { label: '有罪確定', color: 'text-red-500',    bg: 'bg-red-600/20' },
+}
 
-type SortMode = 'name' | 'speeches' | 'recent'
-type SearchMode = 'legislator' | 'speech'
+// === 横断検索の型 ===
+type SearchResult = {
+  type: 'legislator' | 'bill' | 'scandal'
+  id: string
+  title: string
+  subtitle: string
+  href: string
+}
 
-export default function Home() {
-  const [legislators, setLegislators] = useState<(Legislator & { speech_count: number; is_member?: boolean })[]>([])
+export default function Dashboard() {
+  // --- state ---
+  const [stats, setStats] = useState({ legislators: 0, speeches: 0, meetings: 0, bills: 0, scandals: 0 })
+  const [recentMeetings, setRecentMeetings] = useState<any[]>([])
+  const [recentScandals, setRecentScandals] = useState<any[]>([])
+  const [scandalCounts, setScandalCounts] = useState<Record<string, number>>({})
+  const [scandalPartyTop, setScandalPartyTop] = useState<{ party: string; count: number }[]>([])
+  const [topSpeakers, setTopSpeakers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 検索
   const [searchQuery, setSearchQuery] = useState('')
-  const [committedQuery, setCommittedQuery] = useState('')
-  const [partyFilter, setPartyFilter] = useState('all')
-  const [houseFilter, setHouseFilter] = useState<'all' | 'representatives' | 'councillors'>('all')
-  const [sortMode, setSortMode] = useState<SortMode>('speeches')
-  const [searchMode, setSearchMode] = useState<SearchMode>('legislator')
-  const [speechResults, setSpeechResults] = useState<any[]>([])
-  const [searchingSpeeches, setSearchingSpeeches] = useState(false)
-  const [speakerFilter, setSpeakerFilter] = useState('')
-  const [stats, setStats] = useState({ legislators: 0, speeches: 0, meetings: 0 })
-  const [memberFilter, setMemberFilter] = useState<'members' | 'others' | 'all'>('members')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => {
-    async function load() {
-      const [legs, st] = await Promise.all([
-        getLegislatorsWithCounts(),
-        getStats(),
-      ])
-      setLegislators(legs)
-      setStats(st)
-      setLoading(false)
-    }
-    load()
+    loadDashboard()
   }, [])
 
-  // 検索実行（ボタンクリック or Enter）
-  function doSearch() {
-    setCommittedQuery(searchQuery)
-    if (searchMode === 'speech' && searchQuery.length >= 2) {
-      doSpeechSearch()
+  async function loadDashboard() {
+    const [
+      { count: legCount },
+      { count: speechCount },
+      { count: meetingCount },
+      { count: billCount },
+      { count: scandalCount },
+      { data: meetings },
+      { data: scandals },
+      { data: scandalPeople },
+      { data: speakers },
+    ] = await Promise.all([
+      supabase.from('legislators').select('*', { count: 'exact', head: true }),
+      supabase.from('speeches').select('*', { count: 'exact', head: true }),
+      supabase.from('meetings').select('*', { count: 'exact', head: true }),
+      supabase.from('bills').select('*', { count: 'exact', head: true }),
+      supabase.from('scandals').select('*', { count: 'exact', head: true }).eq('is_published', true),
+      supabase.from('meetings').select('*').order('date', { ascending: false }).limit(5),
+      supabase.from('scandals').select('*').eq('is_published', true).order('created_at', { ascending: false }),
+      supabase.from('scandal_people').select('*, legislators(name, current_party)'),
+      supabase.from('v_legislator_rankings').select('*').order('speeches_1y', { ascending: false }).limit(10),
+    ])
+
+    setStats({
+      legislators: legCount || 0,
+      speeches: speechCount || 0,
+      meetings: meetingCount || 0,
+      bills: billCount || 0,
+      scandals: scandalCount || 0,
+    })
+
+    // 会議に発言数を付与
+    if (meetings) {
+      const meetingIds = meetings.map(m => m.id)
+      const { data: speechRows } = await supabase
+        .from('speeches')
+        .select('meeting_id')
+        .in('meeting_id', meetingIds)
+      const countMap: Record<string, number> = {}
+      ;(speechRows || []).forEach(s => {
+        countMap[s.meeting_id] = (countMap[s.meeting_id] || 0) + 1
+      })
+      setRecentMeetings(meetings.map(m => ({ ...m, speech_count: countMap[m.id] || 0 })))
     }
+
+    // 不祥事
+    if (scandals) {
+      setRecentScandals(scandals.slice(0, 3))
+      const counts: Record<string, number> = {}
+      scandals.forEach(s => { counts[s.severity] = (counts[s.severity] || 0) + 1 })
+      setScandalCounts(counts)
+
+      // 会派別TOP
+      const partyMap: Record<string, number> = {}
+      ;(scandalPeople || []).forEach((sp: any) => {
+        const party = sp.legislators?.current_party
+        if (party) {
+          const short = getPartyShortName(party)
+          partyMap[short] = (partyMap[short] || 0) + 1
+        }
+      })
+      setScandalPartyTop(
+        Object.entries(partyMap)
+          .map(([party, count]) => ({ party, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5)
+      )
+    }
+
+    setTopSpeakers(speakers || [])
+    setLoading(false)
   }
 
-  // 発言検索
-  async function doSpeechSearch() {
-    if (searchQuery.length < 2) return
-    setSearchingSpeeches(true)
-    const results = await searchSpeeches(searchQuery, 30, speakerFilter || undefined)
-    setSpeechResults(results)
-    setSearchingSpeeches(false)
+  // === 横断検索 ===
+  async function doSearch(q: string) {
+    if (q.length < 2) { setSearchResults([]); return }
+    setSearching(true)
+    const results: SearchResult[] = []
+
+    const [{ data: legs }, { data: bills }, { data: scans }] = await Promise.all([
+      supabase.from('legislators').select('id, name, name_yomi, current_party, house')
+        .or(`name.ilike.%${q}%,name_yomi.ilike.%${q}%`).limit(5),
+      supabase.from('bills').select('id, bill_name, status, session')
+        .ilike('bill_name', `%${q}%`).limit(5),
+      supabase.from('scandals').select('id, title, severity')
+        .eq('is_published', true).ilike('title', `%${q}%`).limit(5),
+    ])
+
+    ;(legs || []).forEach(l => results.push({
+      type: 'legislator', id: l.id, href: `/legislator/${l.id}`,
+      title: l.name,
+      subtitle: `${getPartyShortName(l.current_party)} / ${getHouseLabel(l.house)}`,
+    }))
+    ;(bills || []).forEach(b => results.push({
+      type: 'bill', id: b.id, href: `/bills/${b.id}`,
+      title: b.bill_name.length > 40 ? b.bill_name.substring(0, 38) + '…' : b.bill_name,
+      subtitle: `第${b.session}回国会 / ${b.status || ''}`,
+    }))
+    ;(scans || []).forEach(s => results.push({
+      type: 'scandal', id: s.id, href: `/scandals`,
+      title: s.title,
+      subtitle: SEVERITY_MAP[s.severity]?.label || s.severity,
+    }))
+
+    setSearchResults(results)
+    setSearching(false)
   }
 
-  // フィルター＋ソート
-  const filtered = legislators
-    .filter((leg) => {
-      // 議員/非議員フィルター
-      if (memberFilter === 'members' && leg.is_member === false) return false
-      if (memberFilter === 'others' && leg.is_member !== false) return false
-      if (searchMode === 'legislator' && committedQuery) {
-        const q = committedQuery.toLowerCase()
-        const matchName = leg.name.toLowerCase().includes(q)
-        const matchYomi = leg.name_yomi?.toLowerCase().includes(q)
-        const matchParty = leg.current_party?.toLowerCase().includes(q)
-        if (!matchName && !matchYomi && !matchParty) return false
-      }
-      if (partyFilter !== 'all') {
-        const party = leg.current_party || ''
-        // 全角→半角変換してからマッチ（ＮＨＫ→NHK対応）
-        const normalized = party.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) =>
-          String.fromCharCode(c.charCodeAt(0) - 0xFEE0)
-        )
-        if (!party.includes(partyFilter) && !normalized.includes(partyFilter)) return false
-      }
-      if (houseFilter !== 'all') {
-        if (leg.house !== houseFilter) return false
-      }
-      return true
-    })
-    .sort((a, b) => {
-      if (sortMode === 'speeches') return (b.speech_count || 0) - (a.speech_count || 0)
-      if (sortMode === 'recent') return (b.last_seen || '').localeCompare(a.last_seen || '')
-      return a.name.localeCompare(b.name, 'ja')
-    })
-
-  // 役職名を短くする
-  function truncatePosition(pos: string | null) {
-    if (!pos) return null
-    if (pos.length > 20) return pos.substring(0, 18) + '…'
-    return pos
-  }
+  const typeIcon = (t: string) => t === 'legislator' ? '👤' : t === 'bill' ? '📜' : '⚠️'
 
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-20 text-center">
         <div className="animate-pulse">
           <div className="text-4xl mb-4">🏛️</div>
-          <p className="text-slate-400">国会データを読み込み中...</p>
+          <p className="text-slate-400">ダッシュボードを読み込み中...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* 統計バー */}
-      {(() => {
-        const memberCount = legislators.filter(l => l.is_member !== false).length
-        const otherCount = legislators.filter(l => l.is_member === false).length
-        return (
-          <div className="grid grid-cols-4 gap-3 mb-8">
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-              <div className="text-3xl font-bold text-blue-400">{memberCount.toLocaleString()}</div>
-              <div className="text-sm text-slate-400 mt-1">人の議員</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-              <div className="text-3xl font-bold text-purple-400">{otherCount.toLocaleString()}</div>
-              <div className="text-sm text-slate-400 mt-1">人の有識者等</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-              <div className="text-3xl font-bold text-emerald-400">{stats.speeches.toLocaleString()}</div>
-              <div className="text-sm text-slate-400 mt-1">件の発言</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
-              <div className="text-3xl font-bold text-amber-400">{stats.meetings.toLocaleString()}</div>
-              <div className="text-sm text-slate-400 mt-1">件の会議</div>
-            </div>
-          </div>
-        )
-      })()}
+    <div className="max-w-6xl mx-auto px-4 py-6">
 
-      {/* 検索モード切替 + 検索バー */}
-      <div className="mb-6">
-        <div className="flex gap-2 mb-2">
-          <button
-            onClick={() => { setSearchMode('legislator'); setSpeechResults([]); setSpeakerFilter(''); setCommittedQuery('') }}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              searchMode === 'legislator' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            👤 議員検索
-          </button>
-          <button
-            onClick={() => { setSearchMode('speech'); setCommittedQuery('') }}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              searchMode === 'speech' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            💬 発言検索
-          </button>
-        </div>
-        <div className="relative flex gap-2">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+      {/* ========== 検索バー ========== */}
+      <div className="relative mb-8">
+        <div className="bg-slate-800/70 border border-slate-700/50 rounded-2xl p-1">
           <input
             type="text"
-            placeholder={searchMode === 'legislator' ? '議員名・政党名で検索...' : '発言内容をキーワードで検索（例: 防衛費、少子化）...'}
+            placeholder="🔍 議員・議案・不祥事を横断検索..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') doSearch() }}
-            className="w-full bg-slate-800 border border-slate-600 rounded-xl py-3 pl-12 pr-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+            onChange={e => {
+              setSearchQuery(e.target.value)
+              setSearchOpen(true)
+              doSearch(e.target.value)
+            }}
+            onFocus={() => searchQuery.length >= 2 && setSearchOpen(true)}
+            onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+            className="w-full bg-transparent px-5 py-3 text-lg text-slate-100 placeholder:text-slate-500 focus:outline-none"
           />
-          <button
-            onClick={doSearch}
-            disabled={searchQuery.length < 1 || searchingSpeeches}
-            className={`px-5 py-3 ${searchMode === 'speech' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'} disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-xl transition-colors shrink-0`}
-          >
-            検索
-          </button>
         </div>
-        {/* 発言者フィルター（発言検索モード時のみ） */}
-        {searchMode === 'speech' && (
-          <div className="relative mt-2">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">👤</span>
-            <input
-              type="text"
-              placeholder="発言者名で絞り込み（例: 高市、石破）..."
-              value={speakerFilter}
-              onChange={(e) => setSpeakerFilter(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') doSpeechSearch() }}
-              className="w-full bg-slate-800/70 border border-slate-700 rounded-xl py-2 pl-12 pr-4 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-            />
-            {speakerFilter && (
-              <button
-                onClick={() => setSpeakerFilter('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-sm"
-              >
-                ✕
-              </button>
-            )}
+        {searchOpen && searchResults.length > 0 && (
+          <div className="absolute z-50 top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+            {searchResults.map(r => (
+              <a key={`${r.type}-${r.id}`} href={r.href}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 border-b border-slate-700/30 last:border-0">
+                <span className="text-lg">{typeIcon(r.type)}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-slate-100 truncate">{r.title}</div>
+                  <div className="text-xs text-slate-500">{r.subtitle}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+        {searchOpen && searchQuery.length >= 2 && searchResults.length === 0 && !searching && (
+          <div className="absolute z-50 top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-center text-slate-500 text-sm">
+            該当なし
           </div>
         )}
       </div>
 
-      {/* 発言検索結果 */}
-      {searchMode === 'speech' && (searchingSpeeches || speechResults.length > 0) && (
-        <div className="mb-8">
-          {searchingSpeeches ? (
-            <div className="text-center py-8">
-              <div className="animate-pulse text-slate-400">🔍 発言を検索中...</div>
-            </div>
-          ) : speechResults.length > 0 ? (
-            <div>
-              <div className="text-sm text-slate-400 mb-3">
-                💬 「{searchQuery}」を含む発言{speakerFilter ? `（${speakerFilter}）` : ''}: {speechResults.length}件
-              </div>
-              <div className="space-y-3">
-                {speechResults.map((sp: any) => {
-                  const content = sp.content || ''
-                  const idx = content.toLowerCase().indexOf(searchQuery.toLowerCase())
-                  const start = Math.max(0, idx - 50)
-                  const end = Math.min(content.length, idx + searchQuery.length + 100)
-                  const snippet = (start > 0 ? '...' : '') + content.substring(start, end) + (end < content.length ? '...' : '')
+      {/* ========== 統計バー ========== */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+        {[
+          { label: '議員', value: stats.legislators, icon: '👤', href: '/legislators' },
+          { label: '発言', value: stats.speeches, icon: '💬', href: '/legislators' },
+          { label: '会議', value: stats.meetings, icon: '🏛️', href: '/meetings' },
+          { label: '議案', value: stats.bills, icon: '📜', href: '/bills' },
+          { label: '不祥事', value: stats.scandals, icon: '⚠️', href: '/scandals' },
+        ].map(s => (
+          <a key={s.label} href={s.href}
+            className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-3 text-center hover:bg-slate-800 hover:border-slate-600 transition-all">
+            <div className="text-lg">{s.icon}</div>
+            <div className="text-xl font-bold text-slate-100">{s.value.toLocaleString()}</div>
+            <div className="text-xs text-slate-500">{s.label}</div>
+          </a>
+        ))}
+      </div>
 
-                  return (
-                    <a
-                      key={sp.id}
-                      href={`/legislator/${sp.legislator_id}`}
-                      className="block bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all"
-                    >
-                      <div className="flex items-center gap-3 mb-2 text-xs">
-                        <span className="text-slate-300 font-bold">{sp.legislators?.name}</span>
-                        <span className={`px-2 py-0.5 rounded border party-tag-${getPartyClass(sp.legislators?.current_party)}`}>
-                          {getPartyShortName(sp.legislators?.current_party)}
-                        </span>
-                        <span className="text-slate-500">{sp.date}</span>
-                        <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-400">
-                          {getHouseLabel(sp.meetings?.house)} {sp.meetings?.meeting_name}
+      {/* ========== 2カラム ========== */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        {/* 左カラム（3/5） */}
+        <div className="lg:col-span-3 space-y-6">
+
+          {/* 直近の国会 */}
+          <section className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-100">🏛️ 直近の国会</h2>
+              <a href="/meetings" className="text-xs text-blue-400 hover:text-blue-300">すべて見る →</a>
+            </div>
+            <div className="space-y-3">
+              {recentMeetings.map(m => (
+                <a key={m.id} href={`/meetings/${m.id}`}
+                  className="block bg-slate-900/50 rounded-lg p-3 hover:bg-slate-900/80 transition-all border border-slate-700/30 hover:border-slate-600/50">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-slate-200 truncate">{m.meeting_name}</div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                        <span>{m.date}</span>
+                        <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{getHouseLabel(m.house)}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-emerald-400 font-bold text-sm">{m.speech_count}</span>
+                      <span className="text-xs text-slate-500 ml-1">発言</span>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+
+          {/* 探索ショートカット */}
+          <section>
+            <h2 className="text-lg font-bold text-slate-100 mb-4">🧭 探索する</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { label: '議員一覧',   icon: '👤', href: '/legislators', desc: '全議員を検索・フィルター' },
+                { label: '議案・採決', icon: '📜', href: '/bills',       desc: '法案の賛否を確認' },
+                { label: '議員比較',   icon: '⚖️', href: '/compare',    desc: '2人の活動を比較' },
+                { label: 'ランキング', icon: '🏆', href: '/rankings',   desc: '活動量ランキング' },
+                { label: '委員会',     icon: '📋', href: '/committee',  desc: '委員会別の発言' },
+                { label: '不祥事一覧', icon: '⚠️', href: '/scandals',   desc: 'スキャンダル検索' },
+              ].map(item => (
+                <a key={item.label} href={item.href}
+                  className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4 hover:bg-slate-800 hover:border-slate-600 transition-all group">
+                  <div className="text-2xl mb-2">{item.icon}</div>
+                  <div className="text-sm font-bold text-slate-200 group-hover:text-blue-400 transition-colors">{item.label}</div>
+                  <div className="text-xs text-slate-500 mt-1">{item.desc}</div>
+                </a>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* 右カラム（2/5） */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* 不祥事ダイジェスト */}
+          <section className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-100">⚠️ 不祥事ダイジェスト</h2>
+              <a href="/scandals" className="text-xs text-blue-400 hover:text-blue-300">すべて見る →</a>
+            </div>
+
+            {/* ステータス別カウント */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {Object.entries(SEVERITY_MAP).map(([key, sv]) => (
+                <div key={key} className={`${sv.bg} rounded-lg p-2 text-center`}>
+                  <div className={`text-lg font-bold ${sv.color}`}>{scandalCounts[key] || 0}</div>
+                  <div className="text-xs text-slate-400">{sv.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 最新3件 */}
+            <div className="space-y-2 mb-4">
+              {recentScandals.map(s => (
+                <a key={s.id} href="/scandals"
+                  className="block bg-slate-900/50 rounded-lg p-3 hover:bg-slate-900/80 transition-all border border-slate-700/30">
+                  <div className="text-sm text-slate-200 truncate">{s.title}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${SEVERITY_MAP[s.severity]?.bg} ${SEVERITY_MAP[s.severity]?.color}`}>
+                      {SEVERITY_MAP[s.severity]?.label || s.severity}
+                    </span>
+                    <span className="text-xs text-slate-600">{s.start_date || ''}</span>
+                  </div>
+                </a>
+              ))}
+              {recentScandals.length === 0 && (
+                <p className="text-sm text-slate-600 text-center py-3">登録された不祥事はありません</p>
+              )}
+            </div>
+
+            {/* 会派別ミニバー */}
+            {scandalPartyTop.length > 0 && (
+              <div>
+                <div className="text-xs text-slate-500 mb-2">会派別 関与件数</div>
+                <div className="space-y-1.5">
+                  {scandalPartyTop.map(p => {
+                    const max = scandalPartyTop[0]?.count || 1
+                    return (
+                      <div key={p.party} className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 w-12 text-right shrink-0">{p.party}</span>
+                        <div className="flex-1 bg-slate-900/50 rounded-full h-4 overflow-hidden">
+                          <div className="bg-red-500/60 h-full rounded-full" style={{ width: `${(p.count / max) * 100}%` }} />
+                        </div>
+                        <span className="text-xs text-red-400 w-6 shrink-0">{p.count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* 発言ランキング TOP10 */}
+          <section className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-100">🏆 発言ランキング（直近1年）</h2>
+              <a href="/rankings" className="text-xs text-blue-400 hover:text-blue-300">全ランキング →</a>
+            </div>
+            <div className="space-y-1">
+              {topSpeakers.map((sp: any, i: number) => {
+                const pd = getPositionDisplay(sp)
+                return (
+                  <a key={sp.legislator_id} href={`/legislator/${sp.legislator_id}`}
+                    className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-700/30 transition-all">
+                    <span className={`w-6 text-center font-bold text-sm ${
+                      i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-600' : 'text-slate-500'
+                    }`}>{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium text-slate-200">{sp.name}</span>
+                        <span className={`text-xs px-1 py-0.5 rounded party-${getPartyClass(sp.current_party)} text-white/80`}>
+                          {getPartyShortName(sp.current_party)}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-400 leading-relaxed">
-                        {snippet.split(new RegExp(`(${searchQuery})`, 'gi')).map((part: string, i: number) =>
-                          part.toLowerCase() === searchQuery.toLowerCase()
-                            ? <mark key={i} className="bg-yellow-500/30 text-yellow-200 px-0.5 rounded">{part}</mark>
-                            : part
-                        )}
-                      </p>
-                    </a>
-                  )
-                })}
-              </div>
+                      {pd.label && (
+                        <div className={`text-xs truncate ${pd.isOverride ? 'text-amber-400/70' : 'text-amber-400/40 italic'}`}>
+                          {pd.label}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-emerald-400 font-bold text-sm">{sp.speeches_1y}</span>
+                      <span className="text-xs text-slate-500 ml-0.5">件</span>
+                    </div>
+                  </a>
+                )
+              })}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <div className="text-slate-500">「{searchQuery}」を含む発言は見つかりませんでした</div>
-            </div>
-          )}
-        </div>
-      )}
+          </section>
 
-      {/* フィルター + ソート */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {/* 議員/発言者フィルター */}
-        <div className="flex gap-1 mr-2">
-          {([
-            { key: 'members', label: '👤 議員' },
-            { key: 'others', label: '🏢 その他の発言者' },
-            { key: 'all', label: '全員' },
-          ] as { key: 'members' | 'others' | 'all'; label: string }[]).map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setMemberFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                memberFilter === f.key ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="w-full sm:w-auto" />
-        {/* 院フィルター */}
-        <div className="flex gap-1 mr-2">
-          {([{key: 'all', label: '全院'}, {key: 'representatives', label: '衆議院'}, {key: 'councillors', label: '参議院'}] as const).map((house) => (
-            <button
-              key={house.key}
-              onClick={() => setHouseFilter(house.key as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                houseFilter === house.key ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {house.label}
-            </button>
-          ))}
-        </div>
-        {/* 政党フィルター */}
-        {PARTY_FILTERS.map((pf) => (
-          <button
-            key={pf.key}
-            onClick={() => setPartyFilter(pf.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-              partyFilter === pf.key
-                ? `${pf.color} border-current bg-current/10`
-                : 'border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500'
-            }`}
-          >
-            {pf.label}
-          </button>
-        ))}
-
-        {/* ソート */}
-        <div className="flex gap-1 ml-auto">
-          {([
-            { key: 'speeches', label: '発言数順' },
-            { key: 'name', label: '名前順' },
-            { key: 'recent', label: '最近の活動順' },
-          ] as { key: SortMode; label: string }[]).map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setSortMode(s.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                sortMode === s.key ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
         </div>
       </div>
-
-      {/* 結果数 */}
-      <div className="text-sm text-slate-500 mb-4">
-        {filtered.length}人の議員を表示中
-      </div>
-
-      {/* 議員カード一覧 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map((leg) => {
-          const partyClass = getPartyClass(leg.current_party)
-          const partyShort = getPartyShortName(leg.current_party)
-          const position = (() => {
-            const pd = getPositionDisplay(leg)
-            return pd.label ? { text: truncatePosition(pd.label), isOverride: pd.isOverride, full: pd.label } : null
-          })()
-          const isInactive = (leg.speech_count || 0) === 0
-          return (
-            <a
-              key={leg.id}
-              href={`/legislator/${leg.id}`}
-              className={`group border rounded-xl p-4 transition-all hover:shadow-lg hover:shadow-slate-900/50 ${
-                isInactive
-                  ? 'bg-slate-900/30 border-slate-800/50 opacity-60 hover:opacity-80'
-                  : 'bg-slate-800/50 hover:bg-slate-800 border-slate-700/50 hover:border-slate-600'
-              }`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="min-w-0 flex-1 mr-2">
-                  <h3 className="text-lg font-bold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
-                    {leg.name}
-                  </h3>
-                  <p className="text-xs text-slate-500">{leg.name_yomi}</p>
-                </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded border shrink-0 party-tag-${partyClass}`}>
-                  {partyShort}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mt-3 flex-wrap">
-                <span className="bg-slate-700/50 px-2 py-0.5 rounded">
-                  {getHouseLabel(leg.house)}
-                </span>
-                {position && (
-                  <span className={`truncate max-w-[200px] ${position.isOverride ? 'text-amber-400' : 'text-amber-400/50 italic'}`} title={position.full}>
-                    {position.text}{!position.isOverride && ' ※'}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/30">
-                <span className="text-xs text-slate-500">
-                  💬 発言 {(leg.speech_count || 0).toLocaleString()}件
-                </span>
-                <span className="text-xs text-slate-600 group-hover:text-blue-400 transition-colors">
-                  詳細を見る →
-                </span>
-              </div>
-            </a>
-          )
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-4xl mb-4">🔍</div>
-          <p className="text-slate-400">該当する議員が見つかりません</p>
-          <p className="text-slate-500 text-sm mt-2">検索条件を変えてみてください</p>
-        </div>
-      )}
     </div>
   )
 }
