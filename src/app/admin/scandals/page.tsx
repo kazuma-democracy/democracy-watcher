@@ -59,7 +59,7 @@ export default function AdminScandalsPage() {
   const [searchKeyword, setSearchKeyword] = useState('不祥事')
   const [articles, setArticles] = useState<Article[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
-  const [selectedArticles, setSelectedArticles] = useState<Set<number>>(new Set())
+  const [savedSources, setSavedSources] = useState<Article[]>([])
 
   // Form
   const [title, setTitle] = useState('')
@@ -192,7 +192,7 @@ export default function AdminScandalsPage() {
   async function searchNews() {
     if (!searchName && !searchKeyword) return
     setSearchLoading(true)
-    setSelectedArticles(new Set())
+    setSearchLoading(true)
     try {
       const q = [searchName, searchKeyword].filter(Boolean).join(' ')
       const res = await fetch(`/api/news?q=${encodeURIComponent(q)}`)
@@ -205,13 +205,20 @@ export default function AdminScandalsPage() {
     }
   }
 
-  function toggleArticle(idx: number) {
-    setSelectedArticles(prev => {
-      const next = new Set(prev)
-      if (next.has(idx)) next.delete(idx)
-      else next.add(idx)
-      return next
-    })
+  function isSourceSaved(article: Article) {
+    return savedSources.some(s => s.url === article.url)
+  }
+
+  function toggleSource(article: Article) {
+    if (isSourceSaved(article)) {
+      setSavedSources(prev => prev.filter(s => s.url !== article.url))
+    } else {
+      setSavedSources(prev => [...prev, article])
+    }
+  }
+
+  function removeSource(url: string) {
+    setSavedSources(prev => prev.filter(s => s.url !== url))
   }
 
   function prefillFromArticle(article: Article) {
@@ -285,15 +292,12 @@ export default function AdminScandalsPage() {
         }
       } else {
         // ---- 新規登録モード ----
-        const sources = Array.from(selectedArticles).map(idx => {
-          const a = articles[idx]
-          return {
-            url: a.url,
-            publisher: a.source,
-            published_at: a.date?.replace(/\//g, '-') || null,
-            snippet: a.title,
-          }
-        })
+        const sources = savedSources.map(a => ({
+          url: a.url,
+          publisher: a.source,
+          published_at: a.date?.replace(/\//g, '-') || null,
+          snippet: a.title,
+        }))
 
         const res = await adminFetch({
           action: 'create_scandal',
@@ -344,7 +348,7 @@ export default function AdminScandalsPage() {
     setActiveTab('register')
     setSubmitResult(null)
     setArticles([])
-    setSelectedArticles(new Set())
+    setSavedSources([])
     // スクロールトップ
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -363,7 +367,7 @@ export default function AdminScandalsPage() {
     setStartDate('')
     setCategory('political_funds')
     setSeverity('allegation')
-    setSelectedArticles(new Set())
+    setSavedSources([])
     setLinkedLegs([])
     setArticles([])
     setSearchName('')
@@ -676,38 +680,104 @@ export default function AdminScandalsPage() {
 
             {/* 検索結果 */}
             {articles.length > 0 && (
-              <div className="border border-slate-700/30 rounded-lg overflow-hidden max-h-[350px] overflow-y-auto">
-                {articles.map((article, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                      idx > 0 ? 'border-t border-slate-700/20' : ''
-                    } ${selectedArticles.has(idx)
-                      ? 'bg-blue-900/30 border-l-2 border-l-blue-500'
-                      : 'hover:bg-slate-700/20'}`}
-                    onClick={() => { toggleArticle(idx); prefillFromArticle(article) }}
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-slate-500">{articles.length}件のニュース</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const newSources = articles.filter(a => !isSourceSaved(a))
+                      if (newSources.length > 0) setSavedSources(prev => [...prev, ...newSources])
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedArticles.has(idx)}
-                      readOnly
-                      className="mt-1 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-200">{article.title}</p>
-                      <div className="flex gap-2 mt-1 text-xs text-slate-500">
-                        <span>{article.source}</span>
-                        <span>{article.date}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    全て追加
+                  </button>
+                  <button
+                    onClick={() => {
+                      const urls = new Set(articles.map(a => a.url))
+                      setSavedSources(prev => prev.filter(s => !urls.has(s.url)))
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    表示分を解除
+                  </button>
+                </div>
               </div>
             )}
-            {articles.length > 0 && selectedArticles.size > 0 && (
-              <p className="text-xs text-blue-400 mt-2">
-                ✓ {selectedArticles.size}件の記事を出典として選択中
-              </p>
+            {articles.length > 0 && (
+              <div className="border border-slate-700/30 rounded-lg overflow-hidden max-h-[350px] overflow-y-auto">
+                {articles.map((article, idx) => {
+                  const saved = isSourceSaved(article)
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                        idx > 0 ? 'border-t border-slate-700/20' : ''
+                      } ${saved
+                        ? 'bg-blue-900/30 border-l-2 border-l-blue-500'
+                        : 'hover:bg-slate-700/20'}`}
+                      onClick={() => { toggleSource(article); prefillFromArticle(article) }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={saved}
+                        readOnly
+                        className="mt-1 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-slate-200">{article.title}</p>
+                        <div className="flex gap-2 mt-1 text-xs text-slate-500">
+                          <span>{article.source}</span>
+                          <span>{article.date}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* 蓄積済み出典一覧 */}
+            {savedSources.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-blue-400">
+                    📎 選択済み出典: {savedSources.length}件
+                  </p>
+                  <button
+                    onClick={() => setSavedSources([])}
+                    className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                  >
+                    全てクリア
+                  </button>
+                </div>
+                <div className="border border-blue-700/30 rounded-lg overflow-hidden max-h-[250px] overflow-y-auto bg-blue-900/10">
+                  {savedSources.map((src, i) => (
+                    <div
+                      key={src.url}
+                      className={`flex items-start gap-2 px-3 py-2 ${i > 0 ? 'border-t border-blue-700/15' : ''}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-slate-300">{src.title}</p>
+                        <div className="flex gap-2 mt-0.5 text-xs text-slate-600">
+                          <span>{src.source}</span>
+                          <span>{src.date}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeSource(src.url)}
+                        className="text-xs text-slate-600 hover:text-red-400 shrink-0 mt-0.5"
+                        title="出典から除外"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-600 mt-1.5">
+                  💡 キーワードを変えて再検索しても、選択済みの出典はそのまま残ります
+                </p>
+              </div>
             )}
           </div>
 
@@ -855,7 +925,7 @@ export default function AdminScandalsPage() {
                   ))}
                 </div>
               )}
-              <p className="text-xs text-slate-600 mt-1">出典: {selectedArticles.size}件</p>
+              <p className="text-xs text-slate-600 mt-1">出典: {savedSources.length}件</p>
             </div>
 
             <button
