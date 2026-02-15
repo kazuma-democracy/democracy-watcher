@@ -239,6 +239,43 @@ export default function BillDetailPage() {
         </div>
       )}
 
+      {/* 関連ニュース検索 */}
+      <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
+        <h2 className="text-sm font-bold text-slate-300 mb-3">📰 関連ニュース</h2>
+        <div className="flex flex-wrap gap-2">
+          {(() => {
+            // 議案名から検索用キーワードを生成（短縮版）
+            const name = bill.bill_name
+            // 「〜の一部を改正する法律案」→ 元の法律名を抽出
+            const lawMatch = name.match(/(.+?)の一部を改正/)
+            const shortName = lawMatch ? lawMatch[1] : name.replace(/に関する法律案$/, '').slice(0, 30)
+            const queries = [
+              { label: '📰 Google News', url: `https://news.google.com/search?q=${encodeURIComponent(shortName)}&hl=ja&gl=JP&ceid=JP:ja` },
+              { label: '🔍 Google検索', url: `https://www.google.com/search?q=${encodeURIComponent(shortName + ' 法案')}&tbm=nws&hl=ja` },
+              { label: '🐦 X (Twitter)', url: `https://x.com/search?q=${encodeURIComponent(shortName)}&f=live` },
+            ]
+            return queries.map((q, i) => (
+              <a
+                key={i}
+                href={q.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-3 py-2 rounded-lg hover:bg-blue-900/30 transition-colors"
+              >
+                {q.label} ↗
+              </a>
+            ))
+          })()}
+        </div>
+        <p className="text-xs text-slate-600 mt-2">
+          「{(() => {
+            const name = bill.bill_name
+            const lawMatch = name.match(/(.+?)の一部を改正/)
+            return lawMatch ? lawMatch[1] : name.replace(/に関する法律案$/, '').slice(0, 30)
+          })()}」で検索
+        </p>
+      </div>
+
       {/* 関連発言 */}
       <div className="mb-8">
         <h2 className="text-sm font-bold text-slate-300 mb-1">
