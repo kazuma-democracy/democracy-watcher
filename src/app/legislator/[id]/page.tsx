@@ -471,33 +471,159 @@ export default function LegislatorPage() {
   )
 }
 
-// ===== 議員関連ニュースコンポーネント =====
-function LegislatorNewsSection({ name, party }: { name: string; party: string | null }) {
-  const [articles, setArticles] = useState<{ title: string; url: string; source: string; date: string }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+// ===== 議員関連ニュースコンポーネント（5タブ式） =====
+type NewsTab = {
+  key: string
+  label: string
+  icon: string
+  keywords: string  // 議員名の後に追加する検索キーワード
+}
 
+const NEWS_TABS: NewsTab[] = [
+  { key: 'latest', label: '最新', icon: '📰', keywords: '' },
+  { key: 'scandal', label: '疑惑・問題', icon: '⚠️', keywords: '裏金 OR 不正 OR 疑惑 OR 不祥事 OR 逮捕 OR 辞任 OR 処分 OR 政治資金' },
+  { key: 'policy', label: '政策・活動', icon: '🏛️', keywords: '法案 OR 政策 OR 提言 OR 委員会 OR 質疑 OR 答弁' },
+  { key: 'election', label: '選挙', icon: '🗳️', keywords: '選挙 OR 出馬 OR 当選 OR 落選 OR 公約' },
+]
+
+type NewsArticle = { title: string; url: string; source: string; date: string }
+
+function LegislatorNewsSection({ name, party }: { name: string; party: string | null }) {
+  const [activeTab, setActiveTab] = useState('latest')
+  const [cache, setCache] = useState<Record<string, NewsArticle[]>>({})
+  const [loadingTab, setLoadingTab] = useState<string | null>(null)
+  const [errorTab, setErrorTab] = useState<string | null>(null)
+  const [customKeyword, setCustomKeyword] = useState('')
+  const [customInput, setCustomInput] = useState('')
+
+  // タブ切り替え or 初回ロード時にニュース取得
   useEffect(() => {
-    async function fetchNews() {
-      try {
-        const query = party ? `${name} ${getPartyShortName(party)}` : name
-        const res = await fetch(`/api/news?q=${encodeURIComponent(query)}`)
-        const data = await res.json()
-        setArticles(data.articles || [])
-      } catch {
-        setError(true)
-      } finally {
-        setLoading(false)
+    fetchTab(activeTab)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function fetchTab(tabKey: string) {
+    setActiveTab(tabKey)
+    // キャッシュがあればスキップ
+    if (cache[tabKey]) return
+
+    setLoadingTab(tabKey)
+    setErrorTab(null)
+    try {
+      let keywords = ''
+      if (tabKey === 'custom') {
+        keywords = customKeyword
+      } else {
+        const tab = NEWS_TABS.find(t => t.key === tabKey)
+        keywords = tab?.keywords || ''
       }
+      const query = keywords ? `${name} ${keywords}` : name
+      const res = await fetch(`/api/news?q=${encodeURIComponent(query)}`)
+      const data = await res.json()
+      setCache(prev => ({ ...prev, [tabKey]: data.articles || [] }))
+    } catch {
+      setErrorTab(tabKey)
+    } finally {
+      setLoadingTab(null)
     }
-    fetchNews()
-  }, [name, party])
+  }
+
+  function handleCustomSearch() {
+    if (!customInput.trim()) return
+    setCustomKeyword(customInput.trim())
+    // カスタムのキャッシュをクリアして再検索
+    setCache(prev => {
+      const next = { ...prev }
+      delete next['custom']
+      return next
+    })
+    setActiveTab('custom')
+    // fetchTabはuseEffect経由ではなく直接呼ぶ
+    setTimeout(() => {
+      fetchCustom(customInput.trim())
+    }, 0)
+  }
+
+  async function fetchCustom(kw: string) {
+    setLoadingTab('custom')
+    setErrorTab(null)
+    try {
+      const query = `${name} ${kw}`
+      const res = await fetch(`/api/news?q=${encodeURIComponent(query)}`)
+      const data = await res.json()
+      setCache(prev => ({ ...prev, custom: data.articles || [] }))
+    } catch {
+      setErrorTab('custom')
+    } finally {
+      setLoadingTab(null)
+    }
+  }
+
+  const articles = cache[activeTab] || []
+  const isLoading = loadingTab === activeTab
+  const isError = errorTab === activeTab
+
+  // 現在のタブの検索クエリ（外部リンク用）
+  const currentQuery = (() => {
+    if (activeTab === 'custom') return `${name} ${customKeyword}`
+    const tab = NEWS_TABS.find(t => t.key === activeTab)
+    return tab?.keywords ? `${name} ${tab.keywords}` : name
+  })()
 
   return (
     <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-8">
       <h2 className="text-sm font-bold text-slate-300 mb-3">📰 関連ニュース</h2>
 
-      {loading && (
+      {/* タブ */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {NEWS_TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => fetchTab(tab.key)}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+              activeTab === tab.key
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+        {/* カスタムタブ（検索済みなら表示） */}
+        {customKeyword && (
+          <button
+            onClick={() => fetchTab('custom')}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+              activeTab === 'custom'
+                ? 'bg-purple-600 border-purple-500 text-white'
+                : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🔎 {customKeyword.length > 10 ? customKeyword.slice(0, 10) + '...' : customKeyword}
+          </button>
+        )}
+      </div>
+
+      {/* カスタム検索入力 */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={customInput}
+          onChange={(e) => setCustomInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleCustomSearch() }}
+          placeholder="カスタムキーワード（例: 裏金 献金）"
+          className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+        />
+        <button
+          onClick={handleCustomSearch}
+          disabled={!customInput.trim()}
+          className="text-xs px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors shrink-0"
+        >
+          🔍 検索
+        </button>
+      </div>
+
+      {/* 記事一覧 */}
+      {isLoading && (
         <div className="animate-pulse space-y-2">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-10 bg-slate-700/30 rounded-lg" />
@@ -505,7 +631,7 @@ function LegislatorNewsSection({ name, party }: { name: string; party: string | 
         </div>
       )}
 
-      {!loading && articles.length > 0 && (
+      {!isLoading && articles.length > 0 && (
         <div className="space-y-1.5 mb-3">
           {articles.map((a, i) => (
             <a
@@ -530,17 +656,18 @@ function LegislatorNewsSection({ name, party }: { name: string; party: string | 
         </div>
       )}
 
-      {!loading && articles.length === 0 && !error && (
+      {!isLoading && articles.length === 0 && !isError && cache[activeTab] !== undefined && (
         <p className="text-xs text-slate-500 mb-3">関連するニュースが見つかりませんでした</p>
       )}
 
-      {error && (
+      {isError && (
         <p className="text-xs text-slate-500 mb-3">ニュースの取得に失敗しました</p>
       )}
 
+      {/* 外部リンク */}
       <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700/30">
         <a
-          href={`https://news.google.com/search?q=${encodeURIComponent(name)}&hl=ja&gl=JP&ceid=JP:ja`}
+          href={`https://news.google.com/search?q=${encodeURIComponent(currentQuery)}&hl=ja&gl=JP&ceid=JP:ja`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-2.5 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
@@ -548,7 +675,7 @@ function LegislatorNewsSection({ name, party }: { name: string; party: string | 
           📰 Google Newsで詳しく ↗
         </a>
         <a
-          href={`https://x.com/search?q=${encodeURIComponent(name)}&f=live`}
+          href={`https://x.com/search?q=${encodeURIComponent(currentQuery)}&f=live`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-2.5 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
