@@ -99,14 +99,14 @@ export default function BillDetailPage() {
       if (chVotes.length === 0) continue
       const yeaSet = new Set(chVotes.filter(v => v.vote === '賛成').map(v => v.party_name))
       const naySet = new Set(chVotes.filter(v => v.vote === '反対').map(v => v.party_name))
-      chambers.push({ chamber: ch, yea: [...yeaSet], nay: [...naySet] })
+      chambers.push({ chamber: ch, yea: Array.from(yeaSet), nay: Array.from(naySet) })
     }
     // chamberが空の場合（古いデータ）
     const noChVotes = votes.filter(v => !v.chamber)
     if (noChVotes.length > 0) {
       const yeaSet = new Set(noChVotes.filter(v => v.vote === '賛成').map(v => v.party_name))
       const naySet = new Set(noChVotes.filter(v => v.vote === '反対').map(v => v.party_name))
-      chambers.push({ chamber: '', yea: [...yeaSet], nay: [...naySet] })
+      chambers.push({ chamber: '', yea: Array.from(yeaSet), nay: Array.from(naySet) })
     }
     return chambers
   })()
