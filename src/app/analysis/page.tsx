@@ -33,7 +33,8 @@ type ContestedBill = {
   n_parties: number
   yes_parties: number
   no_parties: number
-  split_score: number
+  no_ratio: number
+  controversy_score: number
 }
 
 // 主要政党の表示順
@@ -69,8 +70,8 @@ export default function AnalysisPage() {
         const [r1, r2, r3] = await Promise.all([
           supabase.from('v_party_category_votes').select('*'),
           supabase.from('v_party_pair_agreement').select('*'),
-          supabase.from('v_contested_bills').select('*')
-            .order('split_score', { ascending: false })
+          supabase.from('v_bill_controversy').select('*')
+            .order('controversy_score', { ascending: false })
             .limit(200),
         ])
         if (r1.error) throw new Error(`ヒートマップ: ${r1.error.message}`)

@@ -28,6 +28,9 @@ export default function Dashboard() {
   const [scandalCounts, setScandalCounts] = useState<Record<string, number>>({})
   const [scandalPartyTop, setScandalPartyTop] = useState<{ party: string; count: number }[]>([])
   const [topSpeakers, setTopSpeakers] = useState<any[]>([])
+  const [trendingLegislators, setTrendingLegislators] = useState<any[]>([])
+  const [trendingBills, setTrendingBills] = useState<any[]>([])
+  const [controversialBills, setControversialBills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // 検索
@@ -52,6 +55,9 @@ export default function Dashboard() {
       { data: scandals },
       { data: scandalPeople },
       { data: speakers },
+      { data: trendLegs },
+      { data: trendBills },
+      { data: controBills },
     ] = await Promise.all([
       supabase.from('legislators').select('*', { count: 'exact', head: true }).neq('is_member', false),
       supabase.from('legislators').select('*', { count: 'exact', head: true }).eq('is_member', false),
@@ -63,6 +69,9 @@ export default function Dashboard() {
       supabase.from('scandals').select('*').eq('is_published', true).order('created_at', { ascending: false }),
       supabase.from('scandal_people').select('*, legislators(name, current_party)'),
       supabase.from('v_legislator_rankings').select('*').order('speeches_1y', { ascending: false }).limit(10),
+      supabase.from('v_trending_legislators_7d').select('*').order('trend_score', { ascending: false }).limit(5),
+      supabase.from('v_trending_bills_7d').select('*').order('speech_hits_7d', { ascending: false }).limit(5),
+      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(5),
     ])
 
     setStats({
@@ -113,6 +122,9 @@ export default function Dashboard() {
     }
 
     setTopSpeakers(speakers || [])
+    setTrendingLegislators(trendLegs || [])
+    setTrendingBills(trendBills || [])
+    setControversialBills(controBills || [])
     setLoading(false)
   }
 
@@ -258,6 +270,78 @@ export default function Dashboard() {
             </div>
           </section>
 
+          {/* 注目トピック */}
+          <section className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-slate-100 mb-4">🔥 注目トピック</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {/* 注目議員 */}
+              <div>
+                <h3 className="text-sm font-bold text-slate-300 mb-2">注目議員（直近7日）</h3>
+                <div className="space-y-1.5">
+                  {trendingLegislators.length === 0 && (
+                    <p className="text-xs text-slate-600 py-2">直近7日のデータなし</p>
+                  )}
+                  {trendingLegislators.map((tl: any) => {
+                    const pd = getPositionDisplay(tl)
+                    return (
+                      <a key={tl.id} href={`/legislator/${tl.id}`}
+                        className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-700/30 transition-all">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-slate-200">{tl.name}</span>
+                            <span className={`text-xs px-1 py-0.5 rounded party-${getPartyClass(tl.current_party)}`}>
+                              {getPartyShortName(tl.current_party)}
+                            </span>
+                          </div>
+                          {pd.label && (
+                            <div className={`text-xs truncate ${pd.isOverride ? 'text-amber-400/70' : 'text-amber-400/40 italic'}`}>
+                              {pd.label}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-emerald-400 font-bold text-xs">{tl.speeches_7d}</span>
+                          <span className="text-xs text-slate-600 ml-0.5">件/7d</span>
+                        </div>
+                      </a>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 注目議案 */}
+              <div>
+                <h3 className="text-sm font-bold text-slate-300 mb-2">争点法案</h3>
+                <div className="space-y-1.5">
+                  {controversialBills.length === 0 && trendingBills.length === 0 && (
+                    <p className="text-xs text-slate-600 py-2">賛否データ不足</p>
+                  )}
+                  {(controversialBills.length > 0 ? controversialBills : trendingBills).map((tb: any) => (
+                    <a key={tb.bill_id} href={`/bills/${tb.bill_id}`}
+                      className="block py-1.5 px-2 rounded-lg hover:bg-slate-700/30 transition-all">
+                      <div className="text-xs text-slate-200 line-clamp-2 leading-relaxed">{tb.bill_name}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {tb.controversy_score > 0 && (
+                          <>
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-900/20 text-emerald-400">賛成 {tb.yes_parties}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-red-900/20 text-red-400">反対 {tb.no_parties}</span>
+                          </>
+                        )}
+                        {tb.speech_hits_7d > 0 && (
+                          <span className="text-xs text-slate-500">発言 {tb.speech_hits_7d}件/7d</span>
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 text-right">
+              <a href="/analysis" className="text-xs text-blue-400 hover:text-blue-300">分析ページで詳しく →</a>
+            </div>
+          </section>
+
           {/* 探索ショートカット */}
           <section>
             <h2 className="text-lg font-bold text-slate-100 mb-4">🧭 探索する</h2>
@@ -268,6 +352,7 @@ export default function Dashboard() {
                 { label: '議員比較',   icon: '⚖️', href: '/compare',    desc: '2人の活動を比較' },
                 { label: 'ランキング', icon: '🏆', href: '/rankings',   desc: '活動量ランキング' },
                 { label: '委員会',     icon: '📋', href: '/committee',  desc: '委員会別の発言' },
+                { label: '分析',       icon: '📊', href: '/analysis',   desc: '争点・一致率・ヒートマップ' },
                 { label: '不祥事一覧', icon: '⚠️', href: '/scandals',   desc: 'スキャンダル検索' },
               ].map(item => (
                 <a key={item.label} href={item.href}
