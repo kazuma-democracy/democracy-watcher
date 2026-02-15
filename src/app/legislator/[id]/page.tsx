@@ -491,6 +491,7 @@ const NEWS_TABS: NewsTab[] = [
   { key: 'latest', label: '最新', icon: '📰', keywords: '' },
   { key: 'scandal', label: '疑惑・問題', icon: '⚠️', keywords: '裏金 OR 不正 OR 疑惑 OR 不祥事 OR 逮捕 OR 辞任 OR 処分 OR 政治資金' },
   { key: 'policy', label: '政策・活動', icon: '🏛️', keywords: '法案 OR 政策 OR 提言 OR 委員会 OR 質疑 OR 答弁' },
+  { key: 'kenpou', label: '憲法・改憲', icon: '📜', keywords: '憲法 OR 改憲 OR 護憲 OR 憲法審査会 OR 9条 OR 緊急事態条項 OR 国民投票' },
   { key: 'election', label: '選挙', icon: '🗳️', keywords: '選挙 OR 出馬 OR 当選 OR 落選 OR 公約' },
 ]
 
@@ -705,6 +706,7 @@ const SPEECH_TABS = [
   { key: 'security', label: '安全保障', icon: '🛡️', keywords: ['安全保障', '防衛', '自衛隊', '外交', '安保', '米軍'] },
   { key: 'welfare', label: '社会保障', icon: '🏥', keywords: ['年金', '医療', '介護', '福祉', '保険', '少子化'] },
   { key: 'economy', label: '経済・雇用', icon: '📈', keywords: ['経済', '雇用', '賃金', '物価', '金融', '中小企業'] },
+  { key: 'kenpou', label: '憲法・改憲', icon: '📜', keywords: ['憲法', '改憲', '護憲', '九条', '9条', '緊急事態', '国民投票', '憲法審査'] },
   { key: 'scandal', label: '疑惑追及', icon: '⚠️', keywords: ['裏金', '不正', '疑惑', '政治資金', '説明責任', '責任'] },
 ]
 
