@@ -634,7 +634,7 @@ function LegislatorNewsSection({ name, party }: { name: string; party: string | 
       {!isLoading && articles.length > 0 && (
         <>
         <p className="text-xs text-slate-500 mb-2">{articles.length}件のニュース</p>
-        <div className="space-y-1.5 mb-3 max-h-[400px] overflow-y-auto pr-1">
+        <div className="space-y-1.5 mb-3 max-h-[300px] overflow-y-auto pr-1">
           {articles.map((a, i) => (
             <a
               key={i}
