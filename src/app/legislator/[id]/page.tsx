@@ -105,13 +105,13 @@ export default function LegislatorPage() {
       // 不祥事データ
       const { data: scandalPeople } = await supabase
         .from('scandal_people')
-        .select('*, scandals(*), scandals!inner(is_published)')
+        .select('role, scandals!inner(id, title, category, severity, start_date, summary, is_published)')
         .eq('legislator_id', id)
         .eq('scandals.is_published', true)
       if (scandalPeople) {
         const scandalList = scandalPeople
           .filter((sp: any) => sp.scandals)
-          .map((sp: any) => ({ ...sp.scandals, role: sp.role }))
+          .map((sp: any) => ({ ...(sp.scandals as any), role: sp.role }))
         setScandals(scandalList)
       }
 
