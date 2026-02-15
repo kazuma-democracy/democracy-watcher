@@ -92,16 +92,29 @@ function CommitteeWatchPage() {
       .ilike('meeting_name', `%${committeeName}%`)
       .order('date', { ascending: false })
 
-    // 発言一覧
-    const { data: spch } = await supabase
-      .from('speeches')
-      .select('*, legislators(id, name, current_party), meetings!inner(id, meeting_name, house, date)')
-      .ilike('meetings.meeting_name', `%${committeeName}%`)
-      .order('date', { ascending: false })
-      .limit(500)
-
     setMeetings(mtgs || [])
-    setSpeeches(spch || [])
+
+    // 会議IDベースで発言を取得（ilike joinより確実）
+    if (mtgs && mtgs.length > 0) {
+      const meetingIds = mtgs.map((m: any) => m.id)
+      let allSpeeches: any[] = []
+      const chunkSize = 50
+      for (let i = 0; i < meetingIds.length; i += chunkSize) {
+        const chunk = meetingIds.slice(i, i + chunkSize)
+        const { data: spch } = await supabase
+          .from('speeches')
+          .select('*, legislators(id, name, current_party), meetings(id, meeting_name, house, date)')
+          .in('meeting_id', chunk)
+          .order('date', { ascending: false })
+          .limit(500)
+        if (spch) allSpeeches = allSpeeches.concat(spch)
+      }
+      allSpeeches.sort((a, b) => (b.date || b.meetings?.date || '').localeCompare(a.date || a.meetings?.date || ''))
+      setSpeeches(allSpeeches.slice(0, 500))
+    } else {
+      setSpeeches([])
+    }
+
     setLoading(false)
   }
 
