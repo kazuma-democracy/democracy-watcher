@@ -7,9 +7,9 @@ import type { Bill } from '@/lib/supabase'
 const STATUS_FILTERS = [
   { key: 'all', label: '全て' },
   { key: '成立', label: '成立' },
-  { key: '衆議院で審議中', label: '審議中' },
-  { key: '本院議了', label: '本院議了' },
-  { key: '衆議院閉会中審査', label: '閉会中審査' },
+  { key: '審議中', label: '審議中' },
+  { key: '否決', label: '否決' },
+  { key: '未了', label: '未了' },
   { key: '撤回', label: '撤回' },
 ]
 
@@ -22,12 +22,14 @@ const TYPE_FILTERS = [
   { key: '条約', label: '条約' },
   { key: '承認', label: '承認' },
   { key: '決議', label: '決議' },
+  { key: '決算', label: '決算' },
 ]
 
 export default function BillsPage() {
   const [bills, setBills] = useState<Bill[]>([])
   const [sessions, setSessions] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
+  const [houseFilter, setHouseFilter] = useState<string>('衆議院')
   const [sessionFilter, setSessionFilter] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -38,11 +40,12 @@ export default function BillsPage() {
   const perPage = 30
 
   useEffect(() => {
-    getBillSessions().then(s => {
+    getBillSessions(houseFilter).then(s => {
       setSessions(s)
       if (s.length > 0) setSessionFilter(s[0])
+      else setSessionFilter(null)
     })
-  }, [])
+  }, [houseFilter])
 
   useEffect(() => {
     if (sessionFilter === null) return
@@ -52,12 +55,13 @@ export default function BillsPage() {
       status: statusFilter !== 'all' ? statusFilter : undefined,
       billType: typeFilter !== 'all' ? typeFilter : undefined,
       search: searchQuery || undefined,
+      house: houseFilter,
       limit: 200,
     }).then(data => {
       setBills(data)
       setLoading(false)
     })
-  }, [sessionFilter, statusFilter, typeFilter, searchQuery])
+  }, [sessionFilter, statusFilter, typeFilter, searchQuery, houseFilter])
 
   function doSearch() {
     setSearchQuery(searchInput.trim())
@@ -80,10 +84,30 @@ export default function BillsPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* ヘッダー */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-100 mb-1">📜 議案一覧（衆議院）</h1>
+        <div className="flex items-center gap-4 mb-2">
+          <h1 className="text-2xl font-bold text-slate-100">📜 議案一覧</h1>
+          <div className="flex bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+            {['衆議院', '参議院'].map(h => (
+              <button
+                key={h}
+                onClick={() => { setHouseFilter(h); setPage(0); setStatusFilter('all'); setTypeFilter('all'); setCategoryFilter('all'); setSearchQuery(''); setSearchInput('') }}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                  houseFilter === h
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="text-sm text-slate-500">
-          政党別の賛否データ付き。出典：
-          <a href="https://smartnews-smri.github.io/house-of-representatives/" target="_blank" className="underline hover:text-slate-300">
+          {houseFilter === '衆議院' ? '政党別の賛否データ付き。' : ''}出典：
+          <a href={houseFilter === '衆議院'
+            ? "https://smartnews-smri.github.io/house-of-representatives/"
+            : "https://smartnews-smri.github.io/house-of-councillors/"
+          } target="_blank" className="underline hover:text-slate-300">
             スマートニュース メディア研究所
           </a>
         </p>

@@ -190,7 +190,7 @@ export default function BillDetailPage() {
               rel="noopener noreferrer"
               className="text-xs text-blue-400 hover:text-blue-300 border border-blue-700/50 px-3 py-1.5 rounded-lg hover:bg-blue-900/30 transition-colors"
             >
-              衆議院 経過情報 ↗
+              {bill.house === '参議院' ? '参議院 議案情報' : '衆議院 経過情報'} ↗
             </a>
           )}
         </div>

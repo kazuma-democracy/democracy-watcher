@@ -205,10 +205,11 @@ export async function getBills(options: {
   status?: string
   billType?: string
   search?: string
+  house?: string
   limit?: number
   offset?: number
 } = {}) {
-  const { session, status, billType, search, limit = 50, offset = 0 } = options
+  const { session, status, billType, search, house, limit = 50, offset = 0 } = options
 
   let query = supabase
     .from('bills')
@@ -218,21 +219,25 @@ export async function getBills(options: {
     .range(offset, offset + limit - 1)
 
   if (session) query = query.eq('session', session)
-  if (status) query = query.eq('status', status)
+  if (status) query = query.ilike('status', `%${status}%`)
   if (billType) query = query.eq('bill_type', billType)
   if (search) query = query.ilike('bill_name', `%${search}%`)
+  if (house) query = query.eq('house', house)
 
   const { data, error } = await query
   if (error) { console.error(error); return [] }
   return data as Bill[]
 }
 
-export async function getBillSessions(): Promise<number[]> {
-  const { data, error } = await supabase
+export async function getBillSessions(house?: string): Promise<number[]> {
+  let query = supabase
     .from('bills')
     .select('session')
     .order('session', { ascending: false })
 
+  if (house) query = query.eq('house', house)
+
+  const { data, error } = await query
   if (error || !data) return []
   const sessionSet = new Set(data.map((d: any) => d.session).filter(Boolean))
   const sessions = Array.from(sessionSet) as number[]
