@@ -22,7 +22,7 @@ type SearchResult = {
 
 export default function Dashboard() {
   // --- state ---
-  const [stats, setStats] = useState({ legislators: 0, speeches: 0, meetings: 0, bills: 0, scandals: 0 })
+  const [stats, setStats] = useState({ legislators: 0, experts: 0, speeches: 0, meetings: 0, bills: 0, scandals: 0 })
   const [recentMeetings, setRecentMeetings] = useState<any[]>([])
   const [recentScandals, setRecentScandals] = useState<any[]>([])
   const [scandalCounts, setScandalCounts] = useState<Record<string, number>>({})
@@ -42,7 +42,8 @@ export default function Dashboard() {
 
   async function loadDashboard() {
     const [
-      { count: legCount },
+      { count: memberCount },
+      { count: expertCount },
       { count: speechCount },
       { count: meetingCount },
       { count: billCount },
@@ -52,7 +53,8 @@ export default function Dashboard() {
       { data: scandalPeople },
       { data: speakers },
     ] = await Promise.all([
-      supabase.from('legislators').select('*', { count: 'exact', head: true }),
+      supabase.from('legislators').select('*', { count: 'exact', head: true }).neq('is_member', false),
+      supabase.from('legislators').select('*', { count: 'exact', head: true }).eq('is_member', false),
       supabase.from('speeches').select('*', { count: 'exact', head: true }),
       supabase.from('meetings').select('*', { count: 'exact', head: true }),
       supabase.from('bills').select('*', { count: 'exact', head: true }),
@@ -64,7 +66,8 @@ export default function Dashboard() {
     ])
 
     setStats({
-      legislators: legCount || 0,
+      legislators: memberCount || 0,
+      experts: expertCount || 0,
       speeches: speechCount || 0,
       meetings: meetingCount || 0,
       bills: billCount || 0,
@@ -203,9 +206,10 @@ export default function Dashboard() {
       </div>
 
       {/* ========== 統計バー ========== */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         {[
           { label: '議員', value: stats.legislators, icon: '👤', href: '/legislators' },
+          { label: '有識者等', value: stats.experts, icon: '🎓', href: '/legislators' },
           { label: '発言', value: stats.speeches, icon: '💬', href: '/legislators' },
           { label: '会議', value: stats.meetings, icon: '🏛️', href: '/meetings' },
           { label: '議案', value: stats.bills, icon: '📜', href: '/bills' },
