@@ -26,6 +26,7 @@ export default function BillDetailPage() {
   const [speeches, setSpeeches] = useState<RelatedSpeech[]>([])
   const [loading, setLoading] = useState(true)
   const [speechLoading, setSpeechLoading] = useState(true)
+  const [hasCoverage, setHasCoverage] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -36,8 +37,9 @@ export default function BillDetailPage() {
 
       if (b) {
         setSpeechLoading(true)
-        const sp = await getRelatedSpeeches(b, 50)
-        setSpeeches(sp as any[])
+        const result = await getRelatedSpeeches(b, 50)
+        setSpeeches(result.speeches as any[])
+        setHasCoverage(result.hasCoverage)
         setSpeechLoading(false)
       }
     }
@@ -88,8 +90,26 @@ export default function BillDetailPage() {
   }
 
   const votes = bill.bill_votes || []
-  const yea = votes.filter(v => v.vote === '賛成')
-  const nay = votes.filter(v => v.vote === '反対')
+  // 衆参別にグループ化し、同一政党は重複排除
+  const votesByChamber = (() => {
+    const chambers: { chamber: string; yea: string[]; nay: string[] }[] = []
+    const chamberOrder = ['衆議院', '参議院']
+    for (const ch of chamberOrder) {
+      const chVotes = votes.filter(v => v.chamber === ch)
+      if (chVotes.length === 0) continue
+      const yeaSet = new Set(chVotes.filter(v => v.vote === '賛成').map(v => v.party_name))
+      const naySet = new Set(chVotes.filter(v => v.vote === '反対').map(v => v.party_name))
+      chambers.push({ chamber: ch, yea: [...yeaSet], nay: [...naySet] })
+    }
+    // chamberが空の場合（古いデータ）
+    const noChVotes = votes.filter(v => !v.chamber)
+    if (noChVotes.length > 0) {
+      const yeaSet = new Set(noChVotes.filter(v => v.vote === '賛成').map(v => v.party_name))
+      const naySet = new Set(noChVotes.filter(v => v.vote === '反対').map(v => v.party_name))
+      chambers.push({ chamber: '', yea: [...yeaSet], nay: [...naySet] })
+    }
+    return chambers
+  })()
   const keywords = extractBillKeywords(bill.bill_name)
 
   // ステータスの色
@@ -197,45 +217,53 @@ export default function BillDetailPage() {
       </div>
 
       {/* 政党別賛否 */}
-      {votes.length > 0 && (
+      {votesByChamber.length > 0 && (
         <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
           <h2 className="text-sm font-bold text-slate-300 mb-4">🗳️ 政党別賛否</h2>
 
-          {yea.length > 0 && (
-            <div className="mb-4">
-              <div className="text-xs text-emerald-400 font-bold mb-2">
-                ⭕ 賛成（{yea.length}会派）
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {yea.map((v, i) => (
-                  <span
-                    key={i}
-                    className={`party-tag party-tag-${getPartyClass(v.party_name)}`}
-                  >
-                    {v.party_name}
+          {votesByChamber.map((cv, ci) => (
+            <div key={ci} className={ci > 0 ? 'mt-4 pt-4 border-t border-slate-700/30' : ''}>
+              {cv.chamber && votesByChamber.length > 1 && (
+                <div className="mb-2">
+                  <span className={`text-xs px-2 py-0.5 rounded ${
+                    cv.chamber === '衆議院' ? 'bg-blue-900/50 text-blue-300' : 'bg-purple-900/50 text-purple-300'
+                  }`}>
+                    {cv.chamber}
                   </span>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
 
-          {nay.length > 0 && (
-            <div>
-              <div className="text-xs text-red-400 font-bold mb-2">
-                ❌ 反対（{nay.length}会派）
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {nay.map((v, i) => (
-                  <span
-                    key={i}
-                    className={`party-tag party-tag-${getPartyClass(v.party_name)} opacity-70`}
-                  >
-                    {v.party_name}
-                  </span>
-                ))}
-              </div>
+              {cv.yea.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-xs text-emerald-400 font-bold mb-2">
+                    ⭕ 賛成（{cv.yea.length}会派）
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {cv.yea.map((name, i) => (
+                      <span key={i} className={`party-tag party-tag-${getPartyClass(name)}`}>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cv.nay.length > 0 && (
+                <div>
+                  <div className="text-xs text-red-400 font-bold mb-2">
+                    ❌ 反対（{cv.nay.length}会派）
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {cv.nay.map((name, i) => (
+                      <span key={i} className={`party-tag party-tag-${getPartyClass(name)} opacity-70`}>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -259,7 +287,24 @@ export default function BillDetailPage() {
           </div>
         ) : speeches.length === 0 ? (
           <div className="text-center py-12 bg-slate-800/20 rounded-xl border border-slate-700/30">
-            <p className="text-slate-500 text-sm">この議案に関連する発言が見つかりませんでした</p>
+            {!hasCoverage ? (
+              <>
+                <div className="text-3xl mb-3">📂</div>
+                <p className="text-slate-400 text-sm">
+                  第{bill.submit_session || bill.session}回国会の会議録データは未収録です
+                </p>
+                <p className="text-slate-600 text-xs mt-2">
+                  現在、第208〜220回国会のデータを収録しています
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl mb-3">🔍</div>
+                <p className="text-slate-500 text-sm">
+                  「{keywords[0]}」に一致する発言が見つかりませんでした
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-6">

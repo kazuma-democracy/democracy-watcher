@@ -303,23 +303,59 @@ export function extractBillKeywords(billName: string): string[] {
 
 export async function getRelatedSpeeches(bill: Bill, limit = 30) {
   const keywords = extractBillKeywords(bill.bill_name)
-  if (keywords.length === 0) return []
+  if (keywords.length === 0) return { speeches: [], hasCoverage: false }
 
-  // 議案名のキーワードで発言を検索（同じ国会回次）
-  let query = supabase
-    .from('speeches')
-    .select('id, speaker_name, speaker_group, speaker_position, content, speech_url, date, legislator_id, legislators(id, name, current_party), meetings!inner(id, session, meeting_name, house, date)')
-    .ilike('content', `%${keywords[0]}%`)
+  const session = bill.submit_session || bill.session
 
-  // セッション絞り込み（提出回次ベース）
-  if (bill.submit_session) {
-    query = query.eq('meetings.session', bill.submit_session)
+  // Step 1: この回次の会議が存在するか確認
+  if (session) {
+    const { count } = await supabase
+      .from('meetings')
+      .select('*', { count: 'exact', head: true })
+      .eq('session', session)
+
+    if (!count || count === 0) {
+      // この回次のデータ自体がない
+      return { speeches: [], hasCoverage: false }
+    }
+
+    // Step 2: 会議IDを取得
+    const { data: mtgs } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('session', session)
+
+    if (!mtgs || mtgs.length === 0) return { speeches: [], hasCoverage: true }
+
+    // Step 3: 会議IDベースで発言を検索
+    const meetingIds = mtgs.map(m => m.id)
+    const chunkSize = 50
+    let allSpeeches: any[] = []
+
+    for (let i = 0; i < meetingIds.length; i += chunkSize) {
+      const chunk = meetingIds.slice(i, i + chunkSize)
+      const { data } = await supabase
+        .from('speeches')
+        .select('id, speaker_name, speaker_group, speaker_position, content, speech_url, date, legislator_id, legislators(id, name, current_party), meetings(id, session, meeting_name, house, date)')
+        .in('meeting_id', chunk)
+        .ilike('content', `%${keywords[0]}%`)
+        .order('date', { ascending: false })
+        .limit(limit)
+      if (data) allSpeeches = allSpeeches.concat(data)
+    }
+
+    allSpeeches.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    return { speeches: allSpeeches.slice(0, limit), hasCoverage: true }
   }
 
-  const { data, error } = await query
+  // session不明の場合は全体検索
+  const { data, error } = await supabase
+    .from('speeches')
+    .select('id, speaker_name, speaker_group, speaker_position, content, speech_url, date, legislator_id, legislators(id, name, current_party), meetings(id, session, meeting_name, house, date)')
+    .ilike('content', `%${keywords[0]}%`)
     .order('date', { ascending: false })
     .limit(limit)
 
-  if (error) { console.error('Related speeches error:', error); return [] }
-  return data || []
+  if (error) { console.error('Related speeches error:', error); return { speeches: [], hasCoverage: false } }
+  return { speeches: data || [], hasCoverage: true }
 }
