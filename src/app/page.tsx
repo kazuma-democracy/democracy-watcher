@@ -71,7 +71,7 @@ export default function Dashboard() {
       supabase.from('v_legislator_rankings').select('*').order('speeches_1y', { ascending: false }).limit(10),
       supabase.from('v_trending_legislators_7d').select('*').order('trend_score', { ascending: false }).limit(5),
       supabase.from('v_trending_bills_7d').select('*').order('speech_hits_7d', { ascending: false }).limit(5),
-      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(5),
+      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(20),
     ])
 
     setStats({
@@ -124,7 +124,17 @@ export default function Dashboard() {
     setTopSpeakers(speakers || [])
     setTrendingLegislators(trendLegs || [])
     setTrendingBills(trendBills || [])
-    setControversialBills(controBills || [])
+    // 争点法案：予算系が並びすぎないよう多様性フィルター
+    const rawContro = controBills || []
+    const filtered: typeof rawContro = []
+    const seenCategories: Record<string, number> = {}
+    for (const b of rawContro) {
+      const cat = b.category || '不明'
+      seenCategories[cat] = (seenCategories[cat] || 0) + 1
+      if (seenCategories[cat] <= 2) filtered.push(b) // 同カテゴリ最大2件
+      if (filtered.length >= 5) break
+    }
+    setControversialBills(filtered)
     setLoading(false)
   }
 
@@ -310,30 +320,42 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 注目議案 */}
+              {/* 注目議案（争点法案TOP5） */}
               <div>
-                <h3 className="text-sm font-bold text-slate-300 mb-2">争点法案</h3>
-                <div className="space-y-1.5">
+                <h3 className="text-sm font-bold text-slate-300 mb-2">⚡ 与野党が割れた法案</h3>
+                <div className="space-y-2">
                   {controversialBills.length === 0 && trendingBills.length === 0 && (
                     <p className="text-xs text-slate-600 py-2">賛否データ不足</p>
                   )}
-                  {(controversialBills.length > 0 ? controversialBills : trendingBills).map((tb: any) => (
-                    <a key={tb.bill_id} href={`/bills/${tb.bill_id}`}
-                      className="block py-1.5 px-2 rounded-lg hover:bg-slate-700/30 transition-all">
-                      <div className="text-xs text-slate-200 line-clamp-2 leading-relaxed">{tb.bill_name}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        {tb.controversy_score > 0 && (
-                          <>
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-900/20 text-emerald-400">賛成 {tb.yes_parties}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-red-900/20 text-red-400">反対 {tb.no_parties}</span>
-                          </>
-                        )}
-                        {tb.speech_hits_7d > 0 && (
-                          <span className="text-xs text-slate-500">発言 {tb.speech_hits_7d}件/7d</span>
-                        )}
-                      </div>
-                    </a>
-                  ))}
+                  {(controversialBills.length > 0 ? controversialBills : trendingBills).map((tb: any, idx: number) => {
+                    const maxScore = controversialBills[0]?.controversy_score || 1
+                    const pct = Math.round(((tb.controversy_score || 0) / maxScore) * 100)
+                    const totalParties = (tb.yes_parties || 0) + (tb.no_parties || 0)
+                    const yeaPct = totalParties > 0 ? Math.round((tb.yes_parties / totalParties) * 100) : 50
+                    return (
+                      <a key={tb.bill_id} href={`/bills/${tb.bill_id}`}
+                        className="block py-2.5 px-3 rounded-lg bg-slate-800/40 border border-slate-700/20 hover:border-slate-600 hover:bg-slate-800/60 transition-all">
+                        <div className="flex items-start gap-2 mb-1.5">
+                          <span className="text-xs text-slate-600 font-bold shrink-0 mt-0.5">{idx + 1}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-slate-200 line-clamp-2 leading-relaxed">{tb.bill_name}</div>
+                            {tb.category && (
+                              <span className="text-[10px] text-slate-500 mt-0.5 inline-block">{tb.category}</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* 対立度バー */}
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-[10px] text-emerald-400 w-5 text-right">{tb.yes_parties}</span>
+                          <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden flex">
+                            <div className="h-full bg-emerald-500/60 rounded-l-full" style={{ width: `${yeaPct}%` }} />
+                            <div className="h-full bg-red-500/60 rounded-r-full" style={{ width: `${100 - yeaPct}%` }} />
+                          </div>
+                          <span className="text-[10px] text-red-400 w-5">{tb.no_parties}</span>
+                        </div>
+                      </a>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -352,6 +374,7 @@ export default function Dashboard() {
                 { label: '議員比較',   icon: '⚖️', href: '/compare',    desc: '2人の活動を比較' },
                 { label: 'ランキング', icon: '🏆', href: '/rankings',   desc: '活動量ランキング' },
                 { label: '委員会',     icon: '📋', href: '/committee',  desc: '委員会別の発言' },
+                { label: '憲法審査会', icon: '📜', href: '/kenpou',     desc: '憲法改正の議論を追跡' },
                 { label: '分析',       icon: '📊', href: '/analysis',   desc: '争点・一致率・ヒートマップ' },
                 { label: '不祥事一覧', icon: '⚠️', href: '/scandals',   desc: 'スキャンダル検索' },
               ].map(item => (
