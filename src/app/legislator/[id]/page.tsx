@@ -307,7 +307,6 @@ export default function LegislatorPage() {
               })}
             </div>
           )}
-          </div>
         </div>
       </div>
 
