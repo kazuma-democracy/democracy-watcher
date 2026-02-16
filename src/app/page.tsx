@@ -84,6 +84,7 @@ export default function Dashboard() {
   }, [])
 
   async function loadDashboard() {
+    // Phase 1: 軽いカウント系（6本）
     const [
       { count: memberCount },
       { count: expertCount },
@@ -91,14 +92,6 @@ export default function Dashboard() {
       { count: meetingCount },
       { count: billCount },
       { count: scandalCount },
-      { data: meetings },
-      { data: scandals },
-      { data: scandalPeople },
-      { data: speakers },
-      { data: trendLegs },
-      { data: trendBills },
-      { data: controBills },
-      { data: rubberBills },
     ] = await Promise.all([
       supabase.from('legislators').select('*', { count: 'exact', head: true }).neq('is_member', false),
       supabase.from('legislators').select('*', { count: 'exact', head: true }).eq('is_member', false),
@@ -106,14 +99,6 @@ export default function Dashboard() {
       supabase.from('meetings').select('*', { count: 'exact', head: true }),
       supabase.from('bills').select('*', { count: 'exact', head: true }),
       supabase.from('scandals').select('*', { count: 'exact', head: true }).eq('is_published', true),
-      supabase.from('meetings').select('*').order('date', { ascending: false }).limit(5),
-      supabase.from('scandals').select('*').eq('is_published', true).order('created_at', { ascending: false }),
-      supabase.from('scandal_people').select('*, legislators(name, current_party)'),
-      supabase.from('v_legislator_rankings').select('*').order('speeches_1y', { ascending: false }).limit(10),
-      supabase.from('v_trending_legislators_7d').select('*').order('trend_score', { ascending: false }).limit(5),
-      supabase.from('v_trending_bills_7d').select('*').order('speech_hits_7d', { ascending: false }).limit(5),
-      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(200),
-      supabase.from('v_bill_controversy').select('*').lte('no_parties', 2).gte('yes_parties', 4).order('yes_parties', { ascending: false }).limit(100),
     ])
 
     setStats({
@@ -124,6 +109,23 @@ export default function Dashboard() {
       bills: billCount || 0,
       scandals: scandalCount || 0,
     })
+
+    // Phase 2: データ取得系（6本）
+    const [
+      { data: meetings },
+      { data: scandals },
+      { data: scandalPeople },
+      { data: speakers },
+      { data: trendLegs },
+      { data: trendBills },
+    ] = await Promise.all([
+      supabase.from('meetings').select('*').order('date', { ascending: false }).limit(5),
+      supabase.from('scandals').select('*').eq('is_published', true).order('created_at', { ascending: false }),
+      supabase.from('scandal_people').select('*, legislators(name, current_party)'),
+      supabase.from('v_legislator_rankings').select('*').order('speeches_1y', { ascending: false }).limit(10),
+      supabase.from('v_trending_legislators_7d').select('*').order('trend_score', { ascending: false }).limit(5),
+      supabase.from('v_trending_bills_7d').select('*').order('speech_hits_7d', { ascending: false }).limit(5),
+    ])
 
     // 会議に発言数を付与
     if (meetings) {
@@ -166,9 +168,18 @@ export default function Dashboard() {
     setTopSpeakers(speakers || [])
     setTrendingLegislators(trendLegs || [])
     setTrendingBills(trendBills || [])
+    setLoading(false)
+
+    // Phase 3: 重いクエリ（争点法案）— 画面表示後に非同期で読み込み
+    const [
+      { data: controBills },
+      { data: rubberBills },
+    ] = await Promise.all([
+      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(200),
+      supabase.from('v_bill_controversy').select('*').lte('no_parties', 2).gte('yes_parties', 4).order('yes_parties', { ascending: false }).limit(100),
+    ])
     setAllControBills(controBills || [])
     setAllRubberBills(rubberBills || [])
-    setLoading(false)
   }
 
   // === 横断検索 ===
