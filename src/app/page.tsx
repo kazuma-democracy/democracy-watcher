@@ -30,7 +30,8 @@ export default function Dashboard() {
   const [topSpeakers, setTopSpeakers] = useState<any[]>([])
   const [trendingLegislators, setTrendingLegislators] = useState<any[]>([])
   const [trendingBills, setTrendingBills] = useState<any[]>([])
-  const [controversialBills, setControversialBills] = useState<any[]>([])
+  const [allControBills, setAllControBills] = useState<any[]>([])
+  const [controPeriod, setControPeriod] = useState('5y')
   const [loading, setLoading] = useState(true)
 
   // 検索
@@ -38,6 +39,37 @@ export default function Dashboard() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [searching, setSearching] = useState(false)
+
+  // 期間フィルター: 回次→年の概算マッピング
+  const PERIOD_SESSION_MIN: Record<string, number> = {
+    '1y': 219,   // 2025〜
+    '5y': 208,   // 2022〜
+    '10y': 190,  // 2016〜
+    'all': 0,
+  }
+
+  // 期間でフィルターした争点法案と翼賛法案
+  const { filteredContro, rubberStampBills } = (() => {
+    const minSession = PERIOD_SESSION_MIN[controPeriod] || 0
+    const inPeriod = allControBills.filter(b => (b.session || 0) >= minSession)
+
+    // 争点法案（与野党が割れた）：多様性フィルター付き
+    const contro: any[] = []
+    const seenCat: Record<string, number> = {}
+    for (const b of inPeriod.filter(b => b.no_parties >= 3)) {
+      const cat = b.category || '不明'
+      seenCat[cat] = (seenCat[cat] || 0) + 1
+      if (seenCat[cat] <= 2) contro.push(b)
+      if (contro.length >= 5) break
+    }
+
+    // 翼賛法案（ほぼ全会一致、1〜2党だけ反対）
+    const rubber = inPeriod
+      .filter(b => b.no_parties >= 1 && b.no_parties <= 2 && b.yes_parties >= 4)
+      .slice(0, 5)
+
+    return { filteredContro: contro, rubberStampBills: rubber }
+  })()
 
   useEffect(() => {
     loadDashboard()
@@ -71,7 +103,7 @@ export default function Dashboard() {
       supabase.from('v_legislator_rankings').select('*').order('speeches_1y', { ascending: false }).limit(10),
       supabase.from('v_trending_legislators_7d').select('*').order('trend_score', { ascending: false }).limit(5),
       supabase.from('v_trending_bills_7d').select('*').order('speech_hits_7d', { ascending: false }).limit(5),
-      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(20),
+      supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(200),
     ])
 
     setStats({
@@ -124,17 +156,7 @@ export default function Dashboard() {
     setTopSpeakers(speakers || [])
     setTrendingLegislators(trendLegs || [])
     setTrendingBills(trendBills || [])
-    // 争点法案：予算系が並びすぎないよう多様性フィルター
-    const rawContro = controBills || []
-    const filtered: typeof rawContro = []
-    const seenCategories: Record<string, number> = {}
-    for (const b of rawContro) {
-      const cat = b.category || '不明'
-      seenCategories[cat] = (seenCategories[cat] || 0) + 1
-      if (seenCategories[cat] <= 2) filtered.push(b) // 同カテゴリ最大2件
-      if (filtered.length >= 5) break
-    }
-    setControversialBills(filtered)
+    setAllControBills(controBills || [])
     setLoading(false)
   }
 
@@ -320,16 +342,39 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 注目議案（争点法案TOP5） */}
+              {/* 注目議案（争点法案 + 翼賛法案） */}
               <div>
-                <h3 className="text-sm font-bold text-slate-300 mb-2">⚡ 与野党が割れた法案</h3>
-                <div className="space-y-2">
-                  {controversialBills.length === 0 && trendingBills.length === 0 && (
-                    <p className="text-xs text-slate-600 py-2">賛否データ不足</p>
+                {/* 期間フィルター */}
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-sm font-bold text-slate-300">⚡ 賛否が割れた法案</h3>
+                  <div className="flex gap-1 ml-auto">
+                    {[
+                      { key: '1y', label: '1年' },
+                      { key: '5y', label: '5年' },
+                      { key: '10y', label: '10年' },
+                      { key: 'all', label: '全期間' },
+                    ].map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => setControPeriod(p.key)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                          controPeriod === p.key
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700/50 text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 与野党対立 */}
+                <div className="space-y-2 mb-4">
+                  {filteredContro.length === 0 && (
+                    <p className="text-xs text-slate-600 py-2">この期間の対立法案なし</p>
                   )}
-                  {(controversialBills.length > 0 ? controversialBills : trendingBills).map((tb: any, idx: number) => {
-                    const maxScore = controversialBills[0]?.controversy_score || 1
-                    const pct = Math.round(((tb.controversy_score || 0) / maxScore) * 100)
+                  {filteredContro.map((tb: any, idx: number) => {
                     const totalParties = (tb.yes_parties || 0) + (tb.no_parties || 0)
                     const yeaPct = totalParties > 0 ? Math.round((tb.yes_parties / totalParties) * 100) : 50
                     return (
@@ -344,7 +389,6 @@ export default function Dashboard() {
                             )}
                           </div>
                         </div>
-                        {/* 対立度バー */}
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className="text-[10px] text-emerald-400 w-5 text-right">{tb.yes_parties}</span>
                           <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden flex">
@@ -357,6 +401,38 @@ export default function Dashboard() {
                     )
                   })}
                 </div>
+
+                {/* 翼賛法案 */}
+                {rubberStampBills.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-bold text-amber-400/80 mb-2 flex items-center gap-1">
+                      🏛️ ほぼ全会一致（少数党のみ反対）
+                    </h3>
+                    <div className="space-y-1.5">
+                      {rubberStampBills.map((tb: any) => {
+                        const totalParties = (tb.yes_parties || 0) + (tb.no_parties || 0)
+                        const yeaPct = totalParties > 0 ? Math.round((tb.yes_parties / totalParties) * 100) : 50
+                        return (
+                          <a key={tb.bill_id} href={`/bills/${tb.bill_id}`}
+                            className="block py-2 px-3 rounded-lg bg-amber-900/10 border border-amber-700/15 hover:border-amber-600/30 hover:bg-amber-900/20 transition-all">
+                            <div className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{tb.bill_name}</div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-[10px] text-emerald-400 w-5 text-right">{tb.yes_parties}</span>
+                              <div className="flex-1 h-1.5 bg-slate-700/50 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-emerald-500/40 rounded-l-full" style={{ width: `${yeaPct}%` }} />
+                                <div className="h-full bg-amber-500/60 rounded-r-full" style={{ width: `${100 - yeaPct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-amber-400 w-5">{tb.no_parties}</span>
+                            </div>
+                          </a>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1.5">
+                      ※ 反対が1〜2会派のみの法案。多数派の同調圧力に注意
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-3 text-right">
