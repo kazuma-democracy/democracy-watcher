@@ -84,30 +84,22 @@ export default function Dashboard() {
   }, [])
 
   async function loadDashboard() {
-    // Phase 1: 軽いカウント系（6本）
-    const [
-      { count: memberCount },
-      { count: expertCount },
-      { count: speechCount },
-      { count: meetingCount },
-      { count: billCount },
-      { count: scandalCount },
-    ] = await Promise.all([
-      supabase.from('legislators').select('*', { count: 'exact', head: true }).neq('is_member', false),
-      supabase.from('legislators').select('*', { count: 'exact', head: true }).eq('is_member', false),
-      supabase.from('speeches').select('*', { count: 'exact', head: true }),
-      supabase.from('meetings').select('*', { count: 'exact', head: true }),
-      supabase.from('bills').select('*', { count: 'exact', head: true }),
-      supabase.from('scandals').select('*', { count: 'exact', head: true }).eq('is_published', true),
-    ])
+    // Phase 1: app_statsから統計を一発取得（タイムアウトしない）
+    const { data: statsRow, error: statsErr } = await supabase
+      .from('app_stats')
+      .select('*')
+      .eq('id', 1)
+      .single()
+
+    if (statsErr) console.error('app_stats error:', statsErr)
 
     setStats({
-      legislators: memberCount || 0,
-      experts: expertCount || 0,
-      speeches: speechCount || 0,
-      meetings: meetingCount || 0,
-      bills: billCount || 0,
-      scandals: scandalCount || 0,
+      legislators: statsRow?.legislators_count ?? 0,
+      experts: statsRow?.experts_count ?? 0,
+      speeches: statsRow?.speeches_count ?? 0,
+      meetings: statsRow?.meetings_count ?? 0,
+      bills: statsRow?.bills_count ?? 0,
+      scandals: statsRow?.scandals_count ?? 0,
     })
 
     // Phase 2: データ取得系（6本）

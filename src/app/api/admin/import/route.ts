@@ -330,6 +330,15 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // ============================================================
+    // refresh_stats — app_stats を更新
+    // ============================================================
+    if (action === 'refresh_stats') {
+      await db.rpc('refresh_app_stats')
+      const { data: stats } = await db.from('app_stats').select('*').eq('id', 1).single()
+      return NextResponse.json({ ok: true, stats })
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (e: any) {
     console.error('Import API error:', e)
