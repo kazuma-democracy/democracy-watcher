@@ -106,7 +106,7 @@ export default function LegislatorPage() {
       // 不祥事データ
       const { data: scandalPeople } = await supabase
         .from('scandal_people')
-        .select('*, scandals(*), scandals!inner(is_published)')
+        .select('*, scandals!inner(*)')
         .eq('legislator_id', id)
         .eq('scandals.is_published', true)
       if (scandalPeople) {
