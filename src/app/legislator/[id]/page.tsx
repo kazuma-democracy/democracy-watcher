@@ -39,6 +39,7 @@ export default function LegislatorPage() {
   const [reportCard, setReportCard] = useState<any>(null)
   const [scandals, setScandals] = useState<any[]>([])
   const [factChecks, setFactChecks] = useState<any[]>([])
+  const [tags, setTags] = useState<{tag: string; detail: string | null; source: string | null}[]>([])
   useEffect(() => {
     async function load() {
       // 議員情報
@@ -124,6 +125,13 @@ export default function LegislatorPage() {
         .eq('is_published', true)
         .order('published_at', { ascending: false })
       if (fcData) setFactChecks(fcData)
+
+      // タグ取得（裏金・統一教会等）
+      const { data: tagData } = await supabase
+        .from('legislator_tags')
+        .select('tag, detail, source')
+        .eq('legislator_id', id)
+      if (tagData) setTags(tagData)
 
       setLoading(false)
     }
@@ -274,6 +282,31 @@ export default function LegislatorPage() {
                 <div className="text-sm text-amber-400 font-bold">{factChecks.length}件</div>
               </div>
             )}
+          </div>
+          {/* タグバッジ（裏金・統一教会等） */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-700/30">
+              {tags.map((t) => {
+                const tagConfig: Record<string, { emoji: string; label: string; bg: string; text: string; border: string }> = {
+                  '裏金議員': { emoji: '🏴', label: '裏金', bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700/40' },
+                  '統一教会接点': { emoji: '⛪', label: '統一教会', bg: 'bg-purple-900/30', text: 'text-purple-400', border: 'border-purple-700/40' },
+                }
+                const cfg = tagConfig[t.tag] || { emoji: '🏷️', label: t.tag, bg: 'bg-slate-700/30', text: 'text-slate-400', border: 'border-slate-600/40' }
+                return (
+                  <span
+                    key={t.tag}
+                    className={`${cfg.bg} ${cfg.text} border ${cfg.border} px-2.5 py-1 rounded-lg text-xs font-bold cursor-help`}
+                    title={`${t.detail || ''}${t.source ? `\n出典: ${t.source}` : ''}`}
+                  >
+                    {cfg.emoji} {cfg.label}
+                    {t.detail && (
+                      <span className="font-normal ml-1 opacity-70">— {t.detail.length > 40 ? t.detail.substring(0, 38) + '…' : t.detail}</span>
+                    )}
+                  </span>
+                )
+              })}
+            </div>
+          )}
           </div>
         </div>
       </div>
