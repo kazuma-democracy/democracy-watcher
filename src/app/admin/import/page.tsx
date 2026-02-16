@@ -242,6 +242,35 @@ export default function AdminImportPage() {
         )}
       </div>
 
+      {/* 統計キャッシュ更新 */}
+      <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-300">📊 ダッシュボード統計更新</h2>
+            <p className="text-xs text-slate-500 mt-1">インポート後に実行すると、ダッシュボードの数字が最新になります</p>
+          </div>
+          <button
+            onClick={async () => {
+              addLog('📊 統計更新中...')
+              try {
+                const res = await adminFetch({ action: 'refresh_stats' })
+                const data = await res.json()
+                if (data.ok) {
+                  addLog(`✅ 統計更新完了: 発言${data.stats?.speeches_count}件 / 議員${data.stats?.legislators_count}人 / 議案${data.stats?.bills_count}件`)
+                } else {
+                  addLog(`❌ ${data.error}`)
+                }
+              } catch (e: any) {
+                addLog(`❌ ${e.message}`)
+              }
+            }}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shrink-0"
+          >
+            統計を更新
+          </button>
+        </div>
+      </div>
+
       {/* Import Controls */}
       <div className="bg-slate-800/30 rounded-xl border border-slate-700/30 p-5 mb-6">
         <h2 className="text-sm font-bold text-slate-300 mb-3">⚙️ インポート設定</h2>

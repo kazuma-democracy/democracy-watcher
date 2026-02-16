@@ -38,6 +38,7 @@ export default function LegislatorPage() {
   const [partyBillsLoading, setPartyBillsLoading] = useState(true)
   const [reportCard, setReportCard] = useState<any>(null)
   const [scandals, setScandals] = useState<any[]>([])
+  const [factChecks, setFactChecks] = useState<any[]>([])
   useEffect(() => {
     async function load() {
       // 議員情報
@@ -114,6 +115,15 @@ export default function LegislatorPage() {
           .map((sp: any) => ({ ...sp.scandals, role: sp.role }))
         setScandals(scandalList)
       }
+
+      // 発言検証カード
+      const { data: fcData } = await supabase
+        .from('fact_checks')
+        .select('id, title, verdict, evidence_grade, claim, claim_date, category')
+        .eq('legislator_id', id)
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+      if (fcData) setFactChecks(fcData)
 
       setLoading(false)
     }
@@ -258,6 +268,12 @@ export default function LegislatorPage() {
                 <div className="text-sm text-red-400 font-bold">{scandals.length}件</div>
               </div>
             )}
+            {factChecks.length > 0 && (
+              <div>
+                <div className="text-xs text-slate-500 mb-1">発言検証</div>
+                <div className="text-sm text-amber-400 font-bold">{factChecks.length}件</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -308,9 +324,59 @@ export default function LegislatorPage() {
                 </div>
               )
             })}
+      {/* 不祥事フッター */}
             <div className="px-4 py-2 bg-red-900/10 border-t border-red-700/20">
               <p className="text-xs text-red-400/40">
                 報道ベースの記録です。「疑惑」は事実認定を意味しません。
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 発言検証カード */}
+      {factChecks.length > 0 && (
+        <div className="mb-8 -mt-4">
+          <div className="bg-amber-900/10 border border-amber-700/30 rounded-xl overflow-hidden">
+            <div className="px-4 py-2.5 bg-amber-900/20 border-b border-amber-700/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🔍</span>
+                <span className="text-sm font-bold text-amber-300">発言検証</span>
+                <span className="text-xs text-amber-400/60 ml-1">（{factChecks.length}件）</span>
+              </div>
+              <a href="/fact-check" className="text-xs text-amber-400/50 hover:text-amber-400 transition-colors">
+                検証一覧 →
+              </a>
+            </div>
+            {factChecks.map((fc: any, i: number) => {
+              const vMap: Record<string, { label: string; cls: string }> = {
+                accurate: { label: '正確', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' },
+                mostly_accurate: { label: '一部正確', cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
+                unclear: { label: '根拠不明', cls: 'bg-slate-500/20 text-slate-400 border-slate-500/40' },
+                inaccurate: { label: '不正確', cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40' },
+                false: { label: '誤り', cls: 'bg-red-500/20 text-red-400 border-red-500/40' },
+              }
+              const v = fc.verdict ? vMap[fc.verdict] : null
+              return (
+                <a key={fc.id} href={`/fact-check/${fc.id}`}
+                  className={`block px-4 py-3 hover:bg-amber-900/10 transition-colors ${i > 0 ? 'border-t border-amber-700/15' : ''}`}>
+                  <div className="flex items-start gap-2">
+                    {v ? (
+                      <span className={`text-xs px-2 py-0.5 rounded border shrink-0 mt-0.5 ${v.cls}`}>{v.label}</span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded border shrink-0 mt-0.5 bg-slate-700/50 text-slate-500 border-slate-600/50">検証中</span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm text-slate-200 font-medium">{fc.title}</span>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">「{fc.claim}」</p>
+                    </div>
+                  </div>
+                </a>
+              )
+            })}
+            <div className="px-4 py-2 bg-amber-900/10 border-t border-amber-700/20">
+              <p className="text-xs text-amber-400/40">
+                発言と一次資料の照合結果です。人格評価ではありません。
               </p>
             </div>
           </div>
