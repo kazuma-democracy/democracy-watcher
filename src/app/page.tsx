@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [trendingLegislators, setTrendingLegislators] = useState<any[]>([])
   const [trendingBills, setTrendingBills] = useState<any[]>([])
   const [allControBills, setAllControBills] = useState<any[]>([])
+  const [allRubberBills, setAllRubberBills] = useState<any[]>([])
   const [controPeriod, setControPeriod] = useState('5y')
   const [loading, setLoading] = useState(true)
 
@@ -51,9 +52,9 @@ export default function Dashboard() {
   // 期間でフィルターした争点法案と翼賛法案
   const { filteredContro, rubberStampBills } = (() => {
     const minSession = PERIOD_SESSION_MIN[controPeriod] || 0
-    const inPeriod = allControBills.filter(b => (b.session || 0) >= minSession)
 
     // 争点法案（与野党が割れた）：多様性フィルター付き
+    const inPeriod = allControBills.filter(b => (b.session || 0) >= minSession)
     const contro: any[] = []
     const seenCat: Record<string, number> = {}
     for (const b of inPeriod.filter(b => b.no_parties >= 3)) {
@@ -63,10 +64,17 @@ export default function Dashboard() {
       if (contro.length >= 5) break
     }
 
-    // 翼賛法案（ほぼ全会一致、1〜2党だけ反対）
-    const rubber = inPeriod
-      .filter(b => b.no_parties >= 1 && b.no_parties <= 2 && b.yes_parties >= 4)
-      .slice(0, 5)
+    // 翼賛法案（ほぼ全会一致、1〜2党だけ反対）：専用データソース
+    const rubberInPeriod = allRubberBills.filter(b => (b.session || 0) >= minSession)
+    // 多様性フィルター
+    const rubber: any[] = []
+    const seenCat2: Record<string, number> = {}
+    for (const b of rubberInPeriod) {
+      const cat = b.category || '不明'
+      seenCat2[cat] = (seenCat2[cat] || 0) + 1
+      if (seenCat2[cat] <= 2) rubber.push(b)
+      if (rubber.length >= 5) break
+    }
 
     return { filteredContro: contro, rubberStampBills: rubber }
   })()
@@ -90,6 +98,7 @@ export default function Dashboard() {
       { data: trendLegs },
       { data: trendBills },
       { data: controBills },
+      { data: rubberBills },
     ] = await Promise.all([
       supabase.from('legislators').select('*', { count: 'exact', head: true }).neq('is_member', false),
       supabase.from('legislators').select('*', { count: 'exact', head: true }).eq('is_member', false),
@@ -104,6 +113,7 @@ export default function Dashboard() {
       supabase.from('v_trending_legislators_7d').select('*').order('trend_score', { ascending: false }).limit(5),
       supabase.from('v_trending_bills_7d').select('*').order('speech_hits_7d', { ascending: false }).limit(5),
       supabase.from('v_bill_controversy').select('*').order('controversy_score', { ascending: false }).limit(200),
+      supabase.from('v_bill_controversy').select('*').lte('no_parties', 2).gte('yes_parties', 4).order('yes_parties', { ascending: false }).limit(100),
     ])
 
     setStats({
@@ -157,6 +167,7 @@ export default function Dashboard() {
     setTrendingLegislators(trendLegs || [])
     setTrendingBills(trendBills || [])
     setAllControBills(controBills || [])
+    setAllRubberBills(rubberBills || [])
     setLoading(false)
   }
 
