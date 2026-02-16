@@ -39,6 +39,7 @@ export default function Home() {
   const [speakerFilter, setSpeakerFilter] = useState('')
   const [stats, setStats] = useState({ legislators: 0, speeches: 0, meetings: 0 })
   const [memberFilter, setMemberFilter] = useState<'members' | 'others' | 'all'>('members')
+  const [tagMap, setTagMap] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     async function load() {
@@ -48,6 +49,21 @@ export default function Home() {
       ])
       setLegislators(legs)
       setStats(st)
+
+      // タグ取得（裏金・統一教会）
+      const { data: tags } = await supabase
+        .from('legislator_tags')
+        .select('legislator_id, tag')
+        .in('tag', ['裏金議員', '統一教会接点'])
+      if (tags) {
+        const map: Record<string, string[]> = {}
+        for (const t of tags) {
+          if (!map[t.legislator_id]) map[t.legislator_id] = []
+          if (!map[t.legislator_id].includes(t.tag)) map[t.legislator_id].push(t.tag)
+        }
+        setTagMap(map)
+      }
+
       setLoading(false)
     }
     load()
@@ -379,6 +395,16 @@ export default function Home() {
                 {position && (
                   <span className={`truncate max-w-[200px] ${position.isOverride ? 'text-amber-400' : 'text-amber-400/50 italic'}`} title={position.full}>
                     {position.text}{!position.isOverride && ' ※'}
+                  </span>
+                )}
+                {tagMap[leg.id]?.includes('裏金議員') && (
+                  <span className="bg-red-900/40 text-red-400 border border-red-700/40 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    🏴 裏金
+                  </span>
+                )}
+                {tagMap[leg.id]?.includes('統一教会接点') && (
+                  <span className="bg-purple-900/40 text-purple-400 border border-purple-700/40 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    ⛪ 統一教会
                   </span>
                 )}
               </div>
