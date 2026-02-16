@@ -475,6 +475,7 @@ export default function Dashboard() {
                 { label: '憲法審査会', icon: '📜', href: '/kenpou',     desc: '憲法改正の議論を追跡' },
                 { label: '分析',       icon: '📊', href: '/analysis',   desc: '争点・一致率・ヒートマップ' },
                 { label: '不祥事一覧', icon: '⚠️', href: '/scandals',   desc: 'スキャンダル検索' },
+                { label: '発言検証',   icon: '🔍', href: '/fact-check', desc: '発言の正確性を検証' },
               ].map(item => (
                 <a key={item.label} href={item.href}
                   className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4 hover:bg-slate-800 hover:border-slate-600 transition-all group">
